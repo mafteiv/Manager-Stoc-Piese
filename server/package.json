@@ -1,6 +1,7 @@
-{
+﻿{
   "name": "stock-manager-socket-server",
   "version": "1.0.0",
+  "description": "Socket.IO server for Manager Stoc Piese - real-time sync",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
