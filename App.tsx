@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { readExcelRaw, mapDataToProducts, exportToExcel } from './services/xlsxService';
-import { createSession, subscribeToSession, updateSessionProducts, checkSessionExists, InventorySession } from './services/firebase';
+import { createSession, subscribeToSession, updateSessionProducts, checkSessionExists } from './services/firebase';
 import { ProductItem } from './types';
 import { ScannerListener } from './components/ScannerListener';
 import { QuantityModal } from './components/QuantityModal';
@@ -8,8 +8,6 @@ import { QuantityModal } from './components/QuantityModal';
 export default function App() {
   // --- STATE PRINCIPAL ---
   const [products, setProducts] = useState<ProductItem[]>([]);
-  
-  // Mod de lucru: 'SETUP' (alegere) | 'MAPPING' (excel) | 'ACTIVE' (lucru)
   const [appMode, setAppMode] = useState<'SETUP' | 'MAPPING' | 'ACTIVE'>('SETUP');
   
   // Cloud State
@@ -26,15 +24,13 @@ export default function App() {
 
   // UI State
   const [searchTerm, setSearchTerm] = useState("");
-  const [isManualMode, setIsManualMode] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [selectedProduct, setSelectedProduct] = useState<ProductItem | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
 
-  // --- EFECTE PENTRU SINCRONIZARE ---
+  // --- EFECTE ---
 
-  // Scroll la produs
   useEffect(() => {
     if (highlightedId) {
         setTimeout(() => {
@@ -44,11 +40,9 @@ export default function App() {
     }
   }, [highlightedId]);
 
-  // Listener Cloud
   useEffect(() => {
     if (isCloudSyncing && sessionId) {
         const unsubscribe = subscribeToSession(sessionId, (data) => {
-            // Actualizăm datele locale când vine ceva din cloud
             setProducts(data.products);
             setFileName(data.fileName);
             setOriginalHeaders(data.originalHeaders);
@@ -60,25 +54,19 @@ export default function App() {
 
   // --- ACTIUNI ---
 
-  // 1. Start Cloud Session (Desktop)
   const handleStartCloudSession = async () => {
     if (!products.length) return;
-    
-    // Generăm un ID simplu (ex: 4 cifre aleatorii sau un nume)
     const newSessionId = Math.floor(1000 + Math.random() * 9000).toString();
-    
     try {
         await createSession(newSessionId, products, fileName, originalHeaders, columnMapping);
         setSessionId(newSessionId);
         setIsCloudSyncing(true);
         setAppMode('ACTIVE');
-    } catch (e) {
-        setErrorMsg("Eroare la conectarea cu serverul (Firebase). Verifică configurația.");
-        console.error(e);
+    } catch (e: any) {
+        setErrorMsg("Eroare Firebase: " + e.message);
     }
   };
 
-  // 2. Join Session (Zebra)
   const handleJoinSession = async () => {
     if (!joinSessionId) return;
     setErrorMsg(null);
@@ -89,52 +77,69 @@ export default function App() {
             setIsCloudSyncing(true);
             setAppMode('ACTIVE');
         } else {
-            setErrorMsg("Sesiunea nu există. Verifică codul.");
+            setErrorMsg("Sesiunea nu există.");
         }
     } catch (e) {
-        setErrorMsg("Eroare conexiune internet.");
+        setErrorMsg("Eroare conexiune.");
     }
   };
 
-  // 3. Upload File
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    
+    setErrorMsg(null);
+    
     try {
       setFileName(file.name);
+      // Citim fisierul
       const rawData = await readExcelRaw(file);
-      if (rawData.length === 0) { setErrorMsg("Fișier gol."); return; }
+      
+      if (!rawData || rawData.length === 0) { 
+          throw new Error("Fișierul este gol sau nu a putut fi citit.");
+      }
+      
       setRawExcelData(rawData);
       setProducts([]); 
-      setErrorMsg(null);
-      setColumnMapping({ codeIndex: 0, descIndex: 1, stockIndex: rawData[0].length > 2 ? 2 : -1 });
+      
+      // Auto-detectie coloane
+      const headerRow = rawData[0] || [];
+      const stockIdx = headerRow.length > 2 ? 2 : -1;
+      
+      setColumnMapping({ codeIndex: 0, descIndex: 1, stockIndex: stockIdx });
       setAppMode('MAPPING');
-    } catch (err) { setErrorMsg("Eroare fișier Excel."); }
+      
+    } catch (err: any) { 
+      console.error(err);
+      setErrorMsg(`EROARE CRITICĂ: ${err.message}`); 
+    }
   };
 
-  // 4. Confirm Mapping
   const handleConfirmMapping = () => {
     if (!rawExcelData) return;
-    const items = mapDataToProducts(rawExcelData, columnMapping);
-    setOriginalHeaders(rawExcelData[0] || []);
-    setProducts(items);
-    setRawExcelData(null);
-    // Întrebăm utilizatorul dacă vrea Cloud sau Local
-    // Pentru simplitate, mergem direct în pasul de "Creare sesiune Cloud"
-    // Dar o facem automat în handleStartCloudSession apelat din UI
+    try {
+        const items = mapDataToProducts(rawExcelData, columnMapping);
+        if (items.length === 0) {
+            setErrorMsg("Nu s-au putut extrage produse. Verifică coloanele selectate.");
+            return;
+        }
+        setOriginalHeaders(rawExcelData[0] || []);
+        setProducts(items);
+        setRawExcelData(null);
+        setTimeout(handleStartCloudSession, 100);
+    } catch (err: any) {
+        setErrorMsg(`Eroare la mapare: ${err.message}`);
+    }
   };
 
-  // 5. Update Stock Logic (Local + Cloud push)
   const pushUpdateToCloud = (newProducts: ProductItem[]) => {
       setProducts(newProducts);
       if (isCloudSyncing && sessionId) {
-          // Trimitem în cloud (fără să așteptăm, "fire and forget" pt UI rapid)
           updateSessionProducts(sessionId, newProducts).catch(console.error);
       }
   };
 
   const handleScan = useCallback((barcode: string) => {
-    // Logica de scanare identică, dar apelăm pushUpdateToCloud la final
     const codeRaw = barcode.trim();
     if (!codeRaw) return;
     const scannedCodeLower = codeRaw.toLowerCase();
@@ -183,7 +188,6 @@ export default function App() {
             newProducts = [...newProducts, newProductEntry];
             setHighlightedId(newProductEntry.id);
         }
-        
         pushUpdateToCloud(newProducts);
     }
     setIsModalOpen(false);
@@ -213,7 +217,6 @@ export default function App() {
     return products.filter(p => p.code.toLowerCase().includes(lower) || p.description.toLowerCase().includes(lower));
   }, [products, searchTerm]);
 
-  // --- RENDER ---
   const getColLetter = (n: number) => String.fromCharCode(65 + n);
 
   return (
@@ -229,7 +232,6 @@ export default function App() {
         />
       )}
 
-      {/* Header */}
       <header className="bg-blue-600 text-white shadow-md sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
           <div>
@@ -243,7 +245,6 @@ export default function App() {
                 <p className="text-blue-100 text-xs">Mod Local</p>
             )}
           </div>
-          
           <div className="flex gap-2">
             {appMode === 'ACTIVE' && (
                 <button onClick={() => exportToExcel(products, fileName, originalHeaders, columnMapping)} className="bg-white text-blue-600 px-3 py-1.5 rounded text-sm font-bold shadow hover:bg-blue-50">
@@ -251,7 +252,7 @@ export default function App() {
                 </button>
             )}
              <button onClick={() => window.location.reload()} className="text-blue-200 hover:text-white px-2">
-                Ieșire
+                Restart
             </button>
           </div>
         </div>
@@ -259,56 +260,48 @@ export default function App() {
 
       <main className="max-w-7xl mx-auto px-4 py-6">
         
-        {/* VIEW 1: SETUP SCREEN */}
+        {/* VIEW 1: SETUP */}
         {appMode === 'SETUP' && (
             <div className="max-w-md mx-auto grid gap-6 mt-10">
-                {/* CARD 1: DESKTOP */}
                 <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
-                    <h2 className="text-xl font-bold text-gray-800 mb-2 flex items-center gap-2">
-                        🖥️ Sunt pe Desktop
-                    </h2>
-                    <p className="text-gray-500 text-sm mb-4">Încarcă Excelul aici pentru a crea o sesiune de scanare.</p>
+                    <h2 className="text-xl font-bold text-gray-800 mb-2">🖥️ Desktop</h2>
+                    <p className="text-gray-500 text-sm mb-4">Încarcă Excelul pentru a crea sesiunea.</p>
                     
                     <label className="block w-full cursor-pointer bg-blue-600 hover:bg-blue-700 text-white text-center py-3 rounded-lg font-bold transition">
                         Încarcă Fișier Excel
                         <input type="file" accept=".xlsx, .xls" onChange={handleFileUpload} className="hidden" />
                     </label>
-                    {errorMsg && <p className="text-red-500 text-sm mt-2">{errorMsg}</p>}
+                    
+                    {errorMsg && (
+                        <div className="bg-red-100 border-l-4 border-red-500 p-4 mt-4">
+                            <p className="text-red-800 font-bold text-sm">Eroare:</p>
+                            <p className="text-red-700 text-xs mt-1 font-mono">{errorMsg}</p>
+                        </div>
+                    )}
                 </div>
 
                 <div className="flex items-center justify-center text-gray-400 font-bold">- SAU -</div>
 
-                {/* CARD 2: ZEBRA */}
                 <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
-                    <h2 className="text-xl font-bold text-gray-800 mb-2 flex items-center gap-2">
-                        📱 Sunt pe Zebra
-                    </h2>
-                    <p className="text-gray-500 text-sm mb-4">Introdu codul sesiunii generat pe Desktop.</p>
-                    
+                    <h2 className="text-xl font-bold text-gray-800 mb-2">📱 Zebra</h2>
                     <div className="flex gap-2">
                         <input 
                             type="number" 
-                            placeholder="Cod Sesiune (ex: 1234)" 
-                            className="flex-1 border-2 border-gray-300 rounded-lg p-2 text-center text-lg font-bold focus:border-blue-500 focus:outline-none"
+                            placeholder="Cod Sesiune" 
+                            className="flex-1 border border-gray-300 rounded-lg p-2 text-center text-lg font-bold"
                             value={joinSessionId}
                             onChange={(e) => setJoinSessionId(e.target.value)}
                         />
-                        <button 
-                            onClick={handleJoinSession}
-                            className="bg-green-600 hover:bg-green-700 text-white px-6 rounded-lg font-bold"
-                        >
-                            Start
-                        </button>
+                        <button onClick={handleJoinSession} className="bg-green-600 text-white px-6 rounded-lg font-bold">Start</button>
                     </div>
                 </div>
             </div>
         )}
 
-        {/* VIEW 2: MAPPING (Doar pe Desktop apare) */}
+        {/* VIEW 2: MAPPING */}
         {appMode === 'MAPPING' && rawExcelData && (
           <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
              <h2 className="text-2xl font-bold mb-4">Confirmare Coloane</h2>
-             {/* ... Selectorii de coloane (simplificat pt brevitate, logica e aceeasi) ... */}
              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                 <div>
                     <label className="text-xs font-bold text-gray-500">Coloana COD</label>
@@ -323,7 +316,7 @@ export default function App() {
                     </select>
                 </div>
                 <div>
-                    <label className="text-xs font-bold text-gray-500">Coloana STOC (Opțional)</label>
+                    <label className="text-xs font-bold text-gray-500">Coloana STOC</label>
                     <select className="w-full border p-2 rounded" value={columnMapping.stockIndex} onChange={(e) => setColumnMapping({...columnMapping, stockIndex: +e.target.value})}>
                          <option value={-1}>Fără Stoc</option>
                          {rawExcelData[0].map((h:any, i:number) => <option key={i} value={i}>{getColLetter(i)}: {h}</option>)}
@@ -333,36 +326,25 @@ export default function App() {
 
              <div className="flex justify-end gap-4 mt-6">
                 <button onClick={() => { setRawExcelData(null); setAppMode('SETUP'); }} className="text-gray-500">Anulează</button>
-                <button onClick={() => {
-                    handleConfirmMapping(); 
-                    // După confirmare, lansăm automat sesiunea Cloud
-                    setTimeout(handleStartCloudSession, 100); 
-                }} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold">
-                    Creează Sesiune Cloud
-                </button>
+                <button onClick={handleConfirmMapping} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold">Continuă</button>
              </div>
           </div>
         )}
 
-        {/* VIEW 3: ACTIVE WORK */}
+        {/* VIEW 3: ACTIVE */}
         {appMode === 'ACTIVE' && (
              <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                {/* Stats Sidebar */}
                 <div className="lg:col-span-1 space-y-4">
                      <div className="bg-white p-4 rounded-xl shadow-sm border border-blue-100">
-                        <p className="text-xs text-gray-500 uppercase font-bold">Cod Sesiune (pt Zebra)</p>
+                        <p className="text-xs text-gray-500 uppercase font-bold">Cod Sesiune</p>
                         <p className="text-4xl font-mono font-bold text-blue-600 tracking-wider my-2">{sessionId}</p>
-                        <p className="text-xs text-gray-400">Introduceți acest cod pe celălalt dispozitiv.</p>
                      </div>
-                     
                      <div className="bg-white p-4 rounded-xl shadow-sm border">
                         <div className="flex justify-between mb-2"><span>Total:</span> <strong>{stats.total}</strong></div>
                         <div className="flex justify-between mb-2"><span>Scanate:</span> <strong className="text-blue-600">{stats.scanned}</strong></div>
-                        <div className="flex justify-between"><span>Cantitate:</span> <strong className="text-green-600">{stats.count}</strong></div>
                      </div>
                 </div>
 
-                {/* Main List */}
                 <div className="lg:col-span-3">
                      <div className="bg-white p-2 rounded-lg shadow-sm border flex gap-2 mb-4">
                         <input 
@@ -377,7 +359,6 @@ export default function App() {
                         <button onClick={() => handleScan(searchTerm)} className="bg-blue-600 text-white px-4 rounded font-bold">Caută</button>
                      </div>
                      
-                     {/* Tabel simplificat */}
                      <div className="bg-white rounded-lg shadow border overflow-hidden">
                         <div className="overflow-x-auto max-h-[60vh]">
                             <table className="w-full text-left">
