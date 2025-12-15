@@ -6,7 +6,7 @@ import { ScannerListener } from './components/ScannerListener';
 import { QuantityModal } from './components/QuantityModal';
 
 // Constants
-const QR_MODAL_AUTO_CLOSE_DELAY = 10000; // 10 seconds
+// QR modal no longer auto-closes
 
 export default function App() {
   // --- STATE PRINCIPAL ---
@@ -259,11 +259,7 @@ export default function App() {
             
             console.log("✅ Session created successfully!");
             
-            // Auto-close QR modal after delay
-            qrModalTimeoutRef.current = setTimeout(() => {
-                console.log("🔄 Auto-closing QR modal...");
-                setShowQRCode(false);
-            }, QR_MODAL_AUTO_CLOSE_DELAY);
+            // QR modal will stay open until user closes it manually
             
         } catch (err: any) {
             console.error("❌ WebSocket error:", err);
@@ -683,6 +679,8 @@ export default function App() {
     </div>
   );
 }
+
+
 
 
 
