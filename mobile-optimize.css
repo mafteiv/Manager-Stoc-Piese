@@ -1,0 +1,160 @@
+/* Mobile Optimization Styles */
+
+/* Prevent zoom on input focus */
+@media (max-width: 768px) {
+  input, select, textarea, button {
+    font-size: 16px !important; /* Prevents zoom on iOS */
+  }
+
+  /* Optimize spacing for small screens */
+  body {
+    overflow-x: hidden;
+  }
+
+  /* Header optimization */
+  header {
+    padding: 0.5rem 0.5rem !important;
+  }
+
+  /* Reduce padding on main container */
+  main {
+    padding: 0.5rem !important;
+  }
+
+  /* Optimize stats card layout */
+  .stats-card {
+    grid-template-columns: 1fr !important;
+    gap: 0.5rem !important;
+  }
+
+  /* Optimize search input */
+  input[type="text"], input[type="number"] {
+    padding: 0.75rem !important;
+    font-size: 16px !important;
+    border-radius: 0.5rem !important;
+  }
+
+  /* Bigger touch targets for buttons - min 44px */
+  button {
+    min-height: 44px !important;
+    min-width: 44px !important;
+    padding: 0.75rem !important;
+    font-size: 14px !important;
+  }
+
+  /* Optimize table for mobile - stack rows */
+  table {
+    font-size: 12px !important;
+  }
+
+  table th, table td {
+    padding: 0.5rem !important;
+  }
+
+  /* Hide desktop-only columns on small screens */
+  .desktop-only {
+    display: none !important;
+  }
+
+  /* Optimize modal for mobile */
+  [role="dialog"] {
+    width: 95vw !important;
+    max-width: 100% !important;
+    margin: 0 auto !important;
+  }
+
+  .modal-content {
+    padding: 1rem !important;
+  }
+
+  /* QR Code sizing for small screens */
+  #qrcode {
+    width: 200px !important;
+    height: 200px !important;
+  }
+
+  #qrcode canvas,
+  #qrcode img {
+    width: 100% !important;
+    height: 100% !important;
+  }
+
+  /* Session code display */
+  .session-code {
+    font-size: 2rem !important;
+    padding: 1rem 0 !important;
+  }
+
+  /* Optimize form layout */
+  .form-row {
+    flex-direction: column !important;
+    gap: 0.5rem !important;
+  }
+
+  /* Prevent horizontal scroll */
+  * {
+    max-width: 100% !important;
+  }
+
+  /* Optimize keyboard spacing (Zebra terminals) */
+  input[type="text"]:focus {
+    outline: none;
+    border: 2px solid #2563eb !important;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1) !important;
+  }
+
+  /* Better touch feedback */
+  button:active {
+    opacity: 0.8 !important;
+    transform: scale(0.98) !important;
+  }
+}
+
+/* Extra small screens (< 360px) */
+@media (max-width: 360px) {
+  header {
+    padding: 0.25rem !important;
+  }
+
+  main {
+    padding: 0.25rem !important;
+  }
+
+  input[type="text"], button {
+    padding: 0.5rem !important;
+    font-size: 14px !important;
+  }
+
+  .session-code {
+    font-size: 1.5rem !important;
+  }
+
+  #qrcode {
+    width: 150px !important;
+    height: 150px !important;
+  }
+
+  table {
+    font-size: 11px !important;
+  }
+}
+
+/* Landscape orientation optimization */
+@media (max-width: 768px) and (orientation: landscape) {
+  body {
+    font-size: 12px;
+  }
+
+  main {
+    padding: 0.25rem !important;
+  }
+
+  input, button {
+    padding: 0.5rem !important;
+  }
+
+  #qrcode {
+    width: 150px !important;
+    height: 150px !important;
+  }
+}

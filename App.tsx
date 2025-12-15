@@ -577,7 +577,7 @@ export default function App() {
                 {/* Stats & Search Bar */}
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-4 shrink-0">
                     {/* Stats Card */}
-                    <div className="md:col-span-4 bg-white p-3 rounded-xl shadow-sm border border-gray-200 flex justify-around items-center">
+                    <div className="col-span-12 md:col-span-4 bg-white p-2 md:p-3 rounded-lg md:rounded-xl shadow-sm border border-gray-200 flex justify-around items-center">
                         <div className="text-center">
                             <span className="text-xs text-gray-400 uppercase font-bold">Total Linii</span>
                             <div className="text-xl font-bold text-gray-700">{stats.total}</div>
@@ -595,7 +595,7 @@ export default function App() {
                     </div>
 
                     {/* Search Input */}
-                    <div className="md:col-span-8 flex gap-2">
+                    <div className="col-span-12 md:col-span-8 flex gap-1 md:gap-2">
                         <div className="relative flex-grow">
                             <input 
                                 ref={searchInputRef}
@@ -620,7 +620,7 @@ export default function App() {
                 {/* Table Area */}
                 <div className="bg-white rounded-xl shadow border border-gray-200 flex-1 overflow-hidden flex flex-col">
                     <div className="overflow-auto flex-1 relative">
-                        <table className="w-full text-left border-collapse">
+                        <table className="w-full text-left border-collapse text-sm md:text-base">
                             <thead className="bg-gray-100 sticky top-0 z-10 shadow-sm">
                                 <tr>
                                     <th className="p-3 text-xs font-bold uppercase text-gray-500 border-b">Cod Produs</th>
@@ -680,3 +680,7 @@ export default function App() {
     </div>
   );
 }
+
+
+
+
