@@ -33,9 +33,14 @@ export default function App() {
 
   useEffect(() => {
     if (highlightedId) {
+        // Așteptăm puțin ca DOM-ul să se randeze
         setTimeout(() => {
             const row = document.getElementById(`row-${highlightedId}`);
-            if (row) row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            if (row) {
+                row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                // Scoatem highlight-ul după 2 secunde
+                setTimeout(() => setHighlightedId(null), 2000);
+            }
         }, 100);
     }
   }, [highlightedId]);
@@ -43,10 +48,12 @@ export default function App() {
   useEffect(() => {
     if (isCloudSyncing && sessionId) {
         const unsubscribe = subscribeToSession(sessionId, (data) => {
-            setProducts(data.products);
-            setFileName(data.fileName);
-            setOriginalHeaders(data.originalHeaders);
-            setColumnMapping(data.columnMapping);
+            if (data) {
+                setProducts(data.products || []);
+                setFileName(data.fileName);
+                setOriginalHeaders(data.originalHeaders);
+                setColumnMapping(data.columnMapping);
+            }
         });
         return () => unsubscribe();
     }
@@ -126,6 +133,7 @@ export default function App() {
         setOriginalHeaders(rawExcelData[0] || []);
         setProducts(items);
         setRawExcelData(null);
+        // Pornim sesiunea imediat după mapare
         setTimeout(handleStartCloudSession, 100);
     } catch (err: any) {
         setErrorMsg(`Eroare la mapare: ${err.message}`);
@@ -144,7 +152,10 @@ export default function App() {
     if (!codeRaw) return;
     const scannedCodeLower = codeRaw.toLowerCase();
 
+    // Logică avansată de căutare
     let found = products.find(p => p.code.toLowerCase() === scannedCodeLower);
+    
+    // Fallback: căutare parțială sau fără prefixe comune
     if (!found && scannedCodeLower.length > 2) {
         found = products.find(p => p.code.toLowerCase() === scannedCodeLower.substring(1));
     }
@@ -185,7 +196,8 @@ export default function App() {
         } else {
             let finalDesc = description?.trim() || `${selectedProduct.code} - Produs Nou`;
             const newProductEntry = { ...selectedProduct, description: finalDesc, actualStock: qtyToAdd };
-            newProducts = [...newProducts, newProductEntry];
+            // Adăugăm la începutul listei pentru vizibilitate
+            newProducts = [newProductEntry, ...newProducts];
             setHighlightedId(newProductEntry.id);
         }
         pushUpdateToCloud(newProducts);
@@ -220,7 +232,7 @@ export default function App() {
   const getColLetter = (n: number) => String.fromCharCode(65 + n);
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-800 font-sans">
+    <div className="flex flex-col h-screen bg-gray-100 text-gray-800 font-sans overflow-hidden">
       <ScannerListener onScan={handleScan} />
 
       {selectedProduct && (
@@ -232,67 +244,86 @@ export default function App() {
         />
       )}
 
-      <header className="bg-blue-600 text-white shadow-md sticky top-0 z-50">
+      {/* HEADER */}
+      <header className="bg-blue-600 text-white shadow-md z-30 shrink-0">
         <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
-          <div>
-            <h1 className="text-lg md:text-xl font-bold">BookWay Inventory</h1>
+          <div className="flex flex-col">
+            <h1 className="text-lg md:text-xl font-bold flex items-center gap-2">
+              <span>📦</span> BookWay Manager
+            </h1>
             {isCloudSyncing ? (
-                <div className="flex items-center gap-2 bg-blue-700 px-2 py-1 rounded text-xs md:text-sm">
-                    <span className="animate-pulse w-2 h-2 bg-green-400 rounded-full"></span>
-                    <span>Sesiune Activă: <strong>{sessionId}</strong></span>
+                <div className="flex items-center gap-2 mt-1">
+                    <span className="flex h-3 w-3 relative">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+                    </span>
+                    <span className="text-xs bg-blue-800 px-2 py-0.5 rounded text-blue-100">
+                        Sesiune: <strong className="text-white font-mono">{sessionId}</strong>
+                    </span>
                 </div>
             ) : (
-                <p className="text-blue-100 text-xs">Mod Local</p>
+                <p className="text-blue-200 text-xs">Mod Local (Offline)</p>
             )}
           </div>
           <div className="flex gap-2">
             {appMode === 'ACTIVE' && (
-                <button onClick={() => exportToExcel(products, fileName, originalHeaders, columnMapping)} className="bg-white text-blue-600 px-3 py-1.5 rounded text-sm font-bold shadow hover:bg-blue-50">
-                    Export Excel
+                <button 
+                    onClick={() => exportToExcel(products, fileName, originalHeaders, columnMapping)} 
+                    className="bg-white text-blue-700 px-3 py-1.5 rounded-lg text-sm font-bold shadow hover:bg-blue-50 transition flex items-center gap-1"
+                >
+                    <span>💾</span> <span className="hidden md:inline">Export</span>
                 </button>
             )}
-             <button onClick={() => window.location.reload()} className="text-blue-200 hover:text-white px-2">
-                Restart
+             <button onClick={() => window.location.reload()} className="text-blue-200 hover:text-white px-2 text-sm">
+                Ieșire
             </button>
           </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 py-6">
+      {/* MAIN CONTENT AREA */}
+      <main className="flex-1 overflow-y-auto p-4 w-full max-w-7xl mx-auto">
         
         {/* VIEW 1: SETUP */}
         {appMode === 'SETUP' && (
-            <div className="max-w-md mx-auto grid gap-6 mt-10">
-                <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
-                    <h2 className="text-xl font-bold text-gray-800 mb-2">🖥️ Desktop</h2>
-                    <p className="text-gray-500 text-sm mb-4">Încarcă Excelul pentru a crea sesiunea.</p>
+            <div className="max-w-lg mx-auto grid gap-8 mt-10">
+                <div className="bg-white p-8 rounded-2xl shadow-xl border border-blue-100 text-center transition hover:shadow-2xl">
+                    <div className="text-5xl mb-4">🖥️</div>
+                    <h2 className="text-2xl font-bold text-gray-800 mb-2">PC / Laptop</h2>
+                    <p className="text-gray-500 mb-6">Încarcă fișierul Excel de la contabilitate pentru a genera o sesiune de scanare.</p>
                     
-                    <label className="block w-full cursor-pointer bg-blue-600 hover:bg-blue-700 text-white text-center py-3 rounded-lg font-bold transition">
-                        Încarcă Fișier Excel
+                    <label className="block w-full cursor-pointer bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white py-4 rounded-xl font-bold shadow-lg transition transform hover:scale-[1.02]">
+                        📂 Încarcă Fișier Excel
                         <input type="file" accept=".xlsx, .xls" onChange={handleFileUpload} className="hidden" />
                     </label>
                     
                     {errorMsg && (
-                        <div className="bg-red-100 border-l-4 border-red-500 p-4 mt-4">
+                        <div className="bg-red-50 border-l-4 border-red-500 p-4 mt-6 text-left rounded">
                             <p className="text-red-800 font-bold text-sm">Eroare:</p>
-                            <p className="text-red-700 text-xs mt-1 font-mono">{errorMsg}</p>
+                            <p className="text-red-600 text-xs mt-1 font-mono">{errorMsg}</p>
                         </div>
                     )}
                 </div>
 
-                <div className="flex items-center justify-center text-gray-400 font-bold">- SAU -</div>
+                <div className="relative flex py-2 items-center">
+                    <div className="flex-grow border-t border-gray-300"></div>
+                    <span className="flex-shrink-0 mx-4 text-gray-400 font-bold text-sm">SAU CONECTEAZĂ-TE</span>
+                    <div className="flex-grow border-t border-gray-300"></div>
+                </div>
 
-                <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
-                    <h2 className="text-xl font-bold text-gray-800 mb-2">📱 Zebra</h2>
+                <div className="bg-white p-8 rounded-2xl shadow-xl border border-gray-200 text-center">
+                    <div className="text-5xl mb-4">📱</div>
+                    <h2 className="text-2xl font-bold text-gray-800 mb-2">Scanner / Zebra</h2>
+                    <p className="text-gray-500 mb-6">Introdu codul sesiunii creat pe PC.</p>
                     <div className="flex gap-2">
                         <input 
                             type="number" 
-                            placeholder="Cod Sesiune" 
-                            className="flex-1 border border-gray-300 rounded-lg p-2 text-center text-lg font-bold"
+                            placeholder="Cod Sesiune (ex: 1234)" 
+                            className="flex-1 border-2 border-gray-300 rounded-xl p-3 text-center text-xl font-bold focus:border-blue-500 focus:outline-none"
                             value={joinSessionId}
                             onChange={(e) => setJoinSessionId(e.target.value)}
                         />
-                        <button onClick={handleJoinSession} className="bg-green-600 text-white px-6 rounded-lg font-bold">Start</button>
+                        <button onClick={handleJoinSession} className="bg-green-600 hover:bg-green-700 text-white px-6 rounded-xl font-bold shadow-lg transition">START</button>
                     </div>
                 </div>
             </div>
@@ -300,93 +331,143 @@ export default function App() {
 
         {/* VIEW 2: MAPPING */}
         {appMode === 'MAPPING' && rawExcelData && (
-          <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
-             <h2 className="text-2xl font-bold mb-4">Confirmare Coloane</h2>
-             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                <div>
-                    <label className="text-xs font-bold text-gray-500">Coloana COD</label>
-                    <select className="w-full border p-2 rounded" value={columnMapping.codeIndex} onChange={(e) => setColumnMapping({...columnMapping, codeIndex: +e.target.value})}>
-                         {rawExcelData[0].map((h:any, i:number) => <option key={i} value={i}>{getColLetter(i)}: {h}</option>)}
+          <div className="max-w-4xl mx-auto bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden">
+             <div className="bg-gray-50 p-6 border-b">
+                <h2 className="text-2xl font-bold text-gray-800">Configurare Coloane</h2>
+                <p className="text-gray-500 text-sm">Asociază coloanele din Excel cu câmpurile aplicației.</p>
+             </div>
+             
+             <div className="p-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
+                    <label className="block text-xs font-bold text-blue-600 uppercase mb-2">Coloana COD DE BARE</label>
+                    <select className="w-full border-gray-300 border p-3 rounded-lg bg-white shadow-sm focus:ring-2 focus:ring-blue-500 outline-none" value={columnMapping.codeIndex} onChange={(e) => setColumnMapping({...columnMapping, codeIndex: +e.target.value})}>
+                         {rawExcelData[0].map((h:any, i:number) => <option key={i} value={i}>Coloana {getColLetter(i)}: {h}</option>)}
                     </select>
                 </div>
-                <div>
-                    <label className="text-xs font-bold text-gray-500">Coloana DESCRIERE</label>
-                    <select className="w-full border p-2 rounded" value={columnMapping.descIndex} onChange={(e) => setColumnMapping({...columnMapping, descIndex: +e.target.value})}>
-                         {rawExcelData[0].map((h:any, i:number) => <option key={i} value={i}>{getColLetter(i)}: {h}</option>)}
+                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Coloana DESCRIERE</label>
+                    <select className="w-full border-gray-300 border p-3 rounded-lg bg-white shadow-sm outline-none" value={columnMapping.descIndex} onChange={(e) => setColumnMapping({...columnMapping, descIndex: +e.target.value})}>
+                         {rawExcelData[0].map((h:any, i:number) => <option key={i} value={i}>Coloana {getColLetter(i)}: {h}</option>)}
                     </select>
                 </div>
-                <div>
-                    <label className="text-xs font-bold text-gray-500">Coloana STOC</label>
-                    <select className="w-full border p-2 rounded" value={columnMapping.stockIndex} onChange={(e) => setColumnMapping({...columnMapping, stockIndex: +e.target.value})}>
-                         <option value={-1}>Fără Stoc</option>
-                         {rawExcelData[0].map((h:any, i:number) => <option key={i} value={i}>{getColLetter(i)}: {h}</option>)}
+                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Coloana STOC ACTUAL (Scriptic)</label>
+                    <select className="w-full border-gray-300 border p-3 rounded-lg bg-white shadow-sm outline-none" value={columnMapping.stockIndex} onChange={(e) => setColumnMapping({...columnMapping, stockIndex: +e.target.value})}>
+                         <option value={-1}>-- Fără Stoc --</option>
+                         {rawExcelData[0].map((h:any, i:number) => <option key={i} value={i}>Coloana {getColLetter(i)}: {h}</option>)}
                     </select>
                 </div>
              </div>
 
-             <div className="flex justify-end gap-4 mt-6">
-                <button onClick={() => { setRawExcelData(null); setAppMode('SETUP'); }} className="text-gray-500">Anulează</button>
-                <button onClick={handleConfirmMapping} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold">Continuă</button>
+             <div className="bg-gray-50 p-6 flex justify-end gap-4 border-t">
+                <button onClick={() => { setRawExcelData(null); setAppMode('SETUP'); }} className="text-gray-500 font-bold hover:text-gray-700 px-4">Anulează</button>
+                <button onClick={handleConfirmMapping} className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg font-bold shadow-lg transition transform hover:-translate-y-0.5">Confirmă și Începe</button>
              </div>
           </div>
         )}
 
         {/* VIEW 3: ACTIVE */}
         {appMode === 'ACTIVE' && (
-             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                <div className="lg:col-span-1 space-y-4">
-                     <div className="bg-white p-4 rounded-xl shadow-sm border border-blue-100">
-                        <p className="text-xs text-gray-500 uppercase font-bold">Cod Sesiune</p>
-                        <p className="text-4xl font-mono font-bold text-blue-600 tracking-wider my-2">{sessionId}</p>
-                     </div>
-                     <div className="bg-white p-4 rounded-xl shadow-sm border">
-                        <div className="flex justify-between mb-2"><span>Total:</span> <strong>{stats.total}</strong></div>
-                        <div className="flex justify-between mb-2"><span>Scanate:</span> <strong className="text-blue-600">{stats.scanned}</strong></div>
-                     </div>
+             <div className="flex flex-col h-full gap-4">
+                
+                {/* Stats & Search Bar */}
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-4 shrink-0">
+                    {/* Stats Card */}
+                    <div className="md:col-span-4 bg-white p-3 rounded-xl shadow-sm border border-gray-200 flex justify-around items-center">
+                        <div className="text-center">
+                            <span className="text-xs text-gray-400 uppercase font-bold">Total Linii</span>
+                            <div className="text-xl font-bold text-gray-700">{stats.total}</div>
+                        </div>
+                        <div className="h-8 w-px bg-gray-200"></div>
+                        <div className="text-center">
+                            <span className="text-xs text-blue-500 uppercase font-bold">Scanate</span>
+                            <div className="text-2xl font-bold text-blue-600">{stats.scanned}</div>
+                        </div>
+                        <div className="h-8 w-px bg-gray-200"></div>
+                        <div className="text-center">
+                            <span className="text-xs text-green-500 uppercase font-bold">Cantitate</span>
+                            <div className="text-xl font-bold text-green-600">{stats.count}</div>
+                        </div>
+                    </div>
+
+                    {/* Search Input */}
+                    <div className="md:col-span-8 flex gap-2">
+                        <div className="relative flex-grow">
+                            <input 
+                                ref={searchInputRef}
+                                type="text" 
+                                className="w-full h-full p-3 pl-10 rounded-xl border border-gray-300 shadow-sm focus:ring-2 focus:ring-blue-500 focus:outline-none text-lg" 
+                                placeholder="Caută după nume sau scanează cod..." 
+                                value={searchTerm}
+                                onChange={e => setSearchTerm(e.target.value)}
+                                onKeyDown={e => e.key === 'Enter' && handleScan(searchTerm)}
+                            />
+                            <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">🔍</span>
+                        </div>
+                        <button 
+                            onClick={() => handleScan(searchTerm)} 
+                            className="bg-blue-600 text-white px-6 rounded-xl font-bold shadow hover:bg-blue-700 transition"
+                        >
+                            Caută
+                        </button>
+                    </div>
                 </div>
 
-                <div className="lg:col-span-3">
-                     <div className="bg-white p-2 rounded-lg shadow-sm border flex gap-2 mb-4">
-                        <input 
-                            ref={searchInputRef}
-                            type="text" 
-                            className="flex-grow p-2 outline-none" 
-                            placeholder="Caută / Scanează..." 
-                            value={searchTerm}
-                            onChange={e => setSearchTerm(e.target.value)}
-                            onKeyDown={e => e.key === 'Enter' && handleScan(searchTerm)}
-                        />
-                        <button onClick={() => handleScan(searchTerm)} className="bg-blue-600 text-white px-4 rounded font-bold">Caută</button>
-                     </div>
-                     
-                     <div className="bg-white rounded-lg shadow border overflow-hidden">
-                        <div className="overflow-x-auto max-h-[60vh]">
-                            <table className="w-full text-left">
-                                <thead className="bg-gray-50 sticky top-0">
-                                    <tr>
-                                        <th className="p-3 text-xs uppercase text-gray-500">Cod</th>
-                                        <th className="p-3 text-xs uppercase text-gray-500">Descriere</th>
-                                        <th className="p-3 text-center text-xs uppercase text-gray-500">S</th>
-                                        <th className="p-3 text-center text-xs uppercase text-gray-500">F</th>
-                                        <th className="p-3"></th>
+                {/* Table Area */}
+                <div className="bg-white rounded-xl shadow border border-gray-200 flex-1 overflow-hidden flex flex-col">
+                    <div className="overflow-auto flex-1 relative">
+                        <table className="w-full text-left border-collapse">
+                            <thead className="bg-gray-100 sticky top-0 z-10 shadow-sm">
+                                <tr>
+                                    <th className="p-3 text-xs font-bold uppercase text-gray-500 border-b">Cod Produs</th>
+                                    <th className="p-3 text-xs font-bold uppercase text-gray-500 border-b w-1/2">Descriere</th>
+                                    <th className="p-3 text-center text-xs font-bold uppercase text-gray-500 border-b">Scriptic</th>
+                                    <th className="p-3 text-center text-xs font-bold uppercase text-gray-500 border-b bg-blue-50">Faptic</th>
+                                    <th className="p-3 border-b"></th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                                {filteredProducts.map(p => (
+                                    <tr 
+                                        key={p.id} 
+                                        id={`row-${p.id}`} 
+                                        className={`transition-colors duration-300 ${
+                                            p.id === highlightedId 
+                                                ? 'bg-yellow-200' 
+                                                : p.actualStock > 0 
+                                                    ? 'bg-blue-50/50 hover:bg-blue-100' 
+                                                    : 'hover:bg-gray-50'
+                                        }`}
+                                    >
+                                        <td className="p-3 font-mono font-bold text-sm text-gray-700">
+                                            {p.code}
+                                            {p.isNew && <span className="ml-2 px-1.5 py-0.5 bg-purple-100 text-purple-700 text-[10px] rounded border border-purple-200">NOU</span>}
+                                        </td>
+                                        <td className="p-3 text-sm text-gray-600 font-medium">{p.description}</td>
+                                        <td className="p-3 text-center text-gray-400 text-sm">{p.scripticStock}</td>
+                                        <td className="p-3 text-center font-bold text-blue-700 bg-blue-50/30 text-lg">
+                                            {p.actualStock > 0 ? p.actualStock : <span className="text-gray-300">-</span>}
+                                        </td>
+                                        <td className="p-3 text-right">
+                                            <button 
+                                                onClick={() => updateStockManual(p.id, 1)} 
+                                                className="bg-white border border-green-200 text-green-600 w-8 h-8 rounded-full hover:bg-green-500 hover:text-white transition shadow-sm font-bold flex items-center justify-center text-lg pb-1"
+                                            >
+                                                +
+                                            </button>
+                                        </td>
                                     </tr>
-                                </thead>
-                                <tbody className="divide-y">
-                                    {filteredProducts.map(p => (
-                                        <tr key={p.id} id={`row-${p.id}`} className={p.id === highlightedId ? 'bg-yellow-100' : p.actualStock > 0 ? 'bg-blue-50' : ''}>
-                                            <td className="p-3 font-mono font-bold text-sm">{p.code}</td>
-                                            <td className="p-3 text-sm">{p.description}</td>
-                                            <td className="p-3 text-center text-gray-400 text-sm">{p.scripticStock}</td>
-                                            <td className="p-3 text-center font-bold">{p.actualStock}</td>
-                                            <td className="p-3 text-right">
-                                                <button onClick={() => updateStockManual(p.id, 1)} className="bg-green-100 text-green-700 p-1 rounded hover:bg-green-200 text-xs font-bold px-2">+</button>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                     </div>
+                                ))}
+                                {filteredProducts.length === 0 && (
+                                    <tr>
+                                        <td colSpan={5} className="p-10 text-center text-gray-400">
+                                            Nu am găsit produse. Scanează un cod pentru a adăuga unul nou.
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
              </div>
         )}
