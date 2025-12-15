@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { readExcelRaw, mapDataToProducts, exportToExcel } from './services/xlsxService';
-import { connectSocket, createSession as createWSSession, joinSession, onProductsUpdate, updateProducts } from './services/websocket';
+import { createSession, getSession, sessionExists, updateSessionProducts, getLastUpdated } from './services/localStorage';
 import { ProductItem } from './types';
 import { ScannerListener } from './components/ScannerListener';
 import { QuantityModal } from './components/QuantityModal';
@@ -15,6 +15,10 @@ export default function App() {
   const [isConnected, setIsConnected] = useState(false);
   const [showQRCode, setShowQRCode] = useState(false);
   const [joinSessionId, setJoinSessionId] = useState("");
+  
+  // Polling state for localStorage sync
+  const [lastKnownUpdate, setLastKnownUpdate] = useState<number>(0);
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Import State
   const [fileName, setFileName] = useState<string>("");
@@ -58,42 +62,62 @@ export default function App() {
         console.log(`🔍 Auto-joining session from URL: ${sessionParam}`);
         
         // Auto-join
-        setTimeout(async () => {
-            try {
-                const sessionData = await joinSession(sessionParam);
-                
-                setSessionId(sessionParam);
-                setFileName(sessionData.fileName);
-                setProducts(sessionData.products);
-                setOriginalHeaders(sessionData.originalHeaders);
-                setColumnMapping(sessionData.columnMapping);
-                setIsConnected(true);
-                setAppMode('ACTIVE');
-                
-                console.log("✅ Successfully auto-joined session!");
-                
-            } catch (e: any) {
-                console.error("❌ Auto-join error:", e);
-                setErrorMsg(e.message || "Sesiunea nu există.");
+        setTimeout(() => {
+            if (!sessionExists(sessionParam)) {
+                setErrorMsg("Sesiunea nu există.");
+                console.error("❌ Session not found:", sessionParam);
+                return;
             }
+            
+            const sessionData = getSession(sessionParam);
+            if (!sessionData) {
+                setErrorMsg("Eroare la încărcarea sesiunii.");
+                return;
+            }
+            
+            setSessionId(sessionParam);
+            setFileName(sessionData.fileName);
+            setProducts(sessionData.products);
+            setOriginalHeaders(sessionData.originalHeaders);
+            setColumnMapping(sessionData.columnMapping);
+            setLastKnownUpdate(sessionData.lastUpdated);
+            setIsConnected(true);
+            setAppMode('ACTIVE');
+            
+            console.log("✅ Successfully auto-joined session!");
         }, 500);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Listen for product updates when connected
+  // Polling effect for real-time localStorage sync
   useEffect(() => {
-    if (isConnected && sessionId) {
-      const handleProductUpdate = (updatedProducts: ProductItem[]) => {
-        console.log("📦 Received product update");
-        setProducts(updatedProducts);
+    // Start polling when session is active
+    if (appMode === 'ACTIVE' && sessionId) {
+      console.log('🔄 Starting localStorage polling for session:', sessionId);
+      
+      pollingIntervalRef.current = setInterval(() => {
+        const session = getSession(sessionId);
+        if (!session) return;
+        
+        const latestUpdate = session.lastUpdated;
+        
+        // Check if data was updated by another device
+        if (latestUpdate > lastKnownUpdate) {
+          console.log('📦 Detected update from other device. Reloading...');
+          setProducts(session.products);
+          setLastKnownUpdate(latestUpdate);
+        }
+      }, 2000); // Poll every 2 seconds
+      
+      return () => {
+        if (pollingIntervalRef.current) {
+          clearInterval(pollingIntervalRef.current);
+          console.log('🛑 Stopped polling');
+        }
       };
-
-      const cleanup = onProductsUpdate(handleProductUpdate);
-
-      return cleanup;
     }
-  }, [isConnected, sessionId]);
+  }, [appMode, sessionId, lastKnownUpdate]);
 
   // Generate QR code when modal opens
   useEffect(() => {
@@ -102,7 +126,7 @@ export default function App() {
         const qrContainer = document.getElementById('qrcode');
         if (qrContainer && !qrContainer.hasChildNodes() && typeof QRCode !== 'undefined') {
           new QRCode(qrContainer, {
-            text: `${window.location.origin}?session=${sessionId}`,
+            text: `${window.location.origin}${window.location.pathname}?session=${sessionId}`,
             width: 256,
             height: 256
           });
@@ -122,29 +146,34 @@ export default function App() {
 
   // --- ACTIUNI ---
 
-  const handleJoinSession = async () => {
+  const handleJoinSession = () => {
     if (!joinSessionId) return;
     setErrorMsg(null);
     
     console.log(`🔍 Attempting to join session: ${joinSessionId}`);
     
-    try {
-        const sessionData = await joinSession(joinSessionId);
-        
-        setSessionId(joinSessionId);
-        setFileName(sessionData.fileName);
-        setProducts(sessionData.products);
-        setOriginalHeaders(sessionData.originalHeaders);
-        setColumnMapping(sessionData.columnMapping);
-        setIsConnected(true);
-        setAppMode('ACTIVE');
-        
-        console.log("✅ Successfully joined session!");
-        
-    } catch (e: any) {
-        console.error("❌ Join error:", e);
-        setErrorMsg(e.message || "Sesiunea nu există.");
+    if (!sessionExists(joinSessionId)) {
+        setErrorMsg("Sesiunea nu există.");
+        console.error("❌ Session not found:", joinSessionId);
+        return;
     }
+    
+    const sessionData = getSession(joinSessionId);
+    if (!sessionData) {
+        setErrorMsg("Eroare la încărcarea sesiunii.");
+        return;
+    }
+    
+    setSessionId(joinSessionId);
+    setFileName(sessionData.fileName);
+    setProducts(sessionData.products);
+    setOriginalHeaders(sessionData.originalHeaders);
+    setColumnMapping(sessionData.columnMapping);
+    setLastKnownUpdate(sessionData.lastUpdated);
+    setIsConnected(true);
+    setAppMode('ACTIVE');
+    
+    console.log("✅ Successfully joined session!");
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -181,7 +210,7 @@ export default function App() {
     }
   };
 
-  const handleConfirmMapping = async () => {
+  const handleConfirmMapping = () => {
     if (!rawExcelData) return;
     
     console.log("🔄 Starting mapping confirmation...");
@@ -199,31 +228,27 @@ export default function App() {
         setProducts(items);
         setRawExcelData(null);
         
-        // Generate session ID and create WebSocket session
+        // Generate session ID
         const newSessionId = Math.floor(1000 + Math.random() * 9000).toString();
         console.log(`🔑 Generated session ID: ${newSessionId}`);
         
-        try {
-            await createWSSession(newSessionId, {
-                sessionId: newSessionId,
-                fileName,
-                products: items,
-                originalHeaders: rawExcelData[0] || [],
-                columnMapping,
-                createdAt: Date.now()
-            });
-            
-            setSessionId(newSessionId);
-            setIsConnected(true);
-            setShowQRCode(true);
-            setAppMode('ACTIVE');
-            
-            console.log("✅ Session created successfully!");
-            
-        } catch (err: any) {
-            console.error("❌ WebSocket error:", err);
-            setErrorMsg(`Eroare conexiune: ${err.message}`);
-        }
+        // Save to localStorage
+        createSession(newSessionId, {
+            sessionId: newSessionId,
+            fileName,
+            products: items,
+            originalHeaders: rawExcelData[0] || [],
+            columnMapping,
+            createdAt: Date.now()
+        });
+        
+        setSessionId(newSessionId);
+        setLastKnownUpdate(Date.now());
+        setIsConnected(true);
+        setShowQRCode(true);
+        setAppMode('ACTIVE');
+        
+        console.log("✅ Session created in localStorage!");
         
     } catch (err: any) {
         console.error("❌ Mapping error:", err);
@@ -233,8 +258,9 @@ export default function App() {
 
   const pushUpdateToCloud = (newProducts: ProductItem[]) => {
       setProducts(newProducts);
-      if (isConnected && sessionId) {
-          updateProducts(sessionId, newProducts);
+      if (sessionId) {
+          updateSessionProducts(sessionId, newProducts);
+          setLastKnownUpdate(Date.now());
       }
   };
 
@@ -382,7 +408,7 @@ export default function App() {
                     </span>
                 </div>
             ) : (
-                <p className="text-blue-200 text-xs">Mod Local (Offline)</p>
+                <p className="text-blue-200 text-xs">Offline - Încarcă Excel pentru a începe</p>
             )}
           </div>
           <div className="flex gap-2">
