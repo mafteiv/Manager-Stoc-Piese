@@ -1,8 +1,8 @@
 import { io, Socket } from 'socket.io-client';
 import { ProductItem } from '../types';
 
-// Public free Socket.IO server for testing (replace with your own later)
-const SOCKET_SERVER = 'https://socket-io-server.up.railway.app';
+// Use environment variable or default to public test server
+const SOCKET_SERVER = import.meta.env.VITE_SOCKET_SERVER || 'https://socket-io-server.up.railway.app';
 
 let socket: Socket | null = null;
 

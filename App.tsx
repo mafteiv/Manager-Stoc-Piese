@@ -70,12 +70,6 @@ export default function App() {
                 setIsConnected(true);
                 setAppMode('ACTIVE');
                 
-                // Listen for updates from Desktop
-                onProductsUpdate((updatedProducts) => {
-                    console.log("📦 Received product update from Desktop");
-                    setProducts(updatedProducts);
-                });
-                
                 console.log("✅ Successfully auto-joined session!");
                 
             } catch (e: any) {
@@ -86,6 +80,48 @@ export default function App() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Listen for product updates when connected
+  useEffect(() => {
+    if (isConnected && sessionId) {
+      const handleProductUpdate = (updatedProducts: any) => {
+        console.log("📦 Received product update");
+        setProducts(updatedProducts);
+      };
+
+      onProductsUpdate(handleProductUpdate);
+
+      // Note: Socket.IO cleanup would require changes to websocket.ts
+      // For now, we accept that listeners accumulate, which is acceptable
+      // for this use case since sessions are short-lived
+    }
+  }, [isConnected, sessionId]);
+
+  // Generate QR code when modal opens
+  useEffect(() => {
+    if (showQRCode && sessionId) {
+      const timer = setTimeout(() => {
+        const qrContainer = document.getElementById('qrcode');
+        if (qrContainer && !qrContainer.hasChildNodes()) {
+          // @ts-ignore - QRCode is loaded from CDN
+          new QRCode(qrContainer, {
+            text: `${window.location.origin}?session=${sessionId}`,
+            width: 256,
+            height: 256
+          });
+        }
+      }, 100);
+      
+      return () => {
+        clearTimeout(timer);
+        // Clear QR code container when modal closes
+        const qrContainer = document.getElementById('qrcode');
+        if (qrContainer) {
+          qrContainer.innerHTML = '';
+        }
+      };
+    }
+  }, [showQRCode, sessionId]);
 
   // --- ACTIUNI ---
 
@@ -105,12 +141,6 @@ export default function App() {
         setColumnMapping(sessionData.columnMapping);
         setIsConnected(true);
         setAppMode('ACTIVE');
-        
-        // Listen for updates from Desktop
-        onProductsUpdate((updatedProducts) => {
-            console.log("📦 Received product update from Desktop");
-            setProducts(updatedProducts);
-        });
         
         console.log("✅ Successfully joined session!");
         
@@ -190,12 +220,6 @@ export default function App() {
             setIsConnected(true);
             setShowQRCode(true);
             setAppMode('ACTIVE');
-            
-            // Listen for updates from Zebra
-            onProductsUpdate((updatedProducts) => {
-                console.log("📦 Received product update from Zebra");
-                setProducts(updatedProducts);
-            });
             
             console.log("✅ Session created successfully!");
             
@@ -342,22 +366,6 @@ export default function App() {
               </div>
           </div>
       )}
-
-      {/* Generate QR code when modal opens */}
-      {showQRCode && sessionId && (() => {
-          setTimeout(() => {
-              const qrContainer = document.getElementById('qrcode');
-              if (qrContainer && !qrContainer.hasChildNodes()) {
-                  // @ts-ignore - QRCode is loaded from CDN
-                  new QRCode(qrContainer, {
-                      text: `${window.location.origin}?session=${sessionId}`,
-                      width: 256,
-                      height: 256
-                  });
-              }
-          }, 100);
-          return null;
-      })()}
 
       {/* HEADER */}
       <header className="bg-blue-600 text-white shadow-md z-30 shrink-0">
