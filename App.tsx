@@ -97,16 +97,16 @@ export default function App() {
       console.log('🔄 Starting localStorage polling for session:', sessionId);
       
       pollingIntervalRef.current = setInterval(() => {
-        const latestUpdate = getLastUpdated(sessionId);
+        const session = getSession(sessionId);
+        if (!session) return;
+        
+        const latestUpdate = session.lastUpdated;
         
         // Check if data was updated by another device
         if (latestUpdate > lastKnownUpdate) {
           console.log('📦 Detected update from other device. Reloading...');
-          const session = getSession(sessionId);
-          if (session) {
-            setProducts(session.products);
-            setLastKnownUpdate(latestUpdate);
-          }
+          setProducts(session.products);
+          setLastKnownUpdate(latestUpdate);
         }
       }, 2000); // Poll every 2 seconds
       
