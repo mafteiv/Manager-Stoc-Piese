@@ -232,7 +232,16 @@ export default function App() {
     return products.filter(p => p.code.toLowerCase().includes(lower) || p.description.toLowerCase().includes(lower));
   }, [products, searchTerm]);
 
-  const getColLetter = (n: number) => String.fromCharCode(65 + n);
+  // Helper: Convertește index de coloană în literă (0 = A, 1 = B, etc.)
+  const getColLetter = (index: number): string => {
+    let letter = '';
+    let num = index;
+    while (num >= 0) {
+      letter = String.fromCharCode((num % 26) + 65) + letter;
+      num = Math.floor(num / 26) - 1;
+    }
+    return letter;
+  };
 
   return (
     <div className="flex flex-col h-screen bg-gray-100 text-gray-800 font-sans overflow-hidden">
