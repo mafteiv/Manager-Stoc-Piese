@@ -74,12 +74,19 @@ export const joinSession = (sessionId: string): Promise<SessionData> => {
 };
 
 // Both: Listen for real-time product updates
-export const onProductsUpdate = (callback: (products: ProductItem[]) => void): void => {
+export const onProductsUpdate = (callback: (products: ProductItem[]) => void): (() => void) => {
   const s = connectSocket();
-  s.on('products-updated', (data: { products: ProductItem[] }) => {
+  const handler = (data: { products: ProductItem[] }) => {
     console.log('📦 Products updated from server');
     callback(data.products);
-  });
+  };
+  
+  s.on('products-updated', handler);
+  
+  // Return cleanup function
+  return () => {
+    s.off('products-updated', handler);
+  };
 };
 
 // Both: Update products and broadcast to all connected clients

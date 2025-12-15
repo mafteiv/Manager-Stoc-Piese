@@ -89,11 +89,9 @@ export default function App() {
         setProducts(updatedProducts);
       };
 
-      onProductsUpdate(handleProductUpdate);
+      const cleanup = onProductsUpdate(handleProductUpdate);
 
-      // Note: Socket.IO cleanup would require changes to websocket.ts
-      // For now, we accept that listeners accumulate, which is acceptable
-      // for this use case since sessions are short-lived
+      return cleanup;
     }
   }, [isConnected, sessionId]);
 
@@ -103,7 +101,6 @@ export default function App() {
       const timer = setTimeout(() => {
         const qrContainer = document.getElementById('qrcode');
         if (qrContainer && !qrContainer.hasChildNodes()) {
-          // @ts-ignore - QRCode is loaded from CDN
           new QRCode(qrContainer, {
             text: `${window.location.origin}?session=${sessionId}`,
             width: 256,
