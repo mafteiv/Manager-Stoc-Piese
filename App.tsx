@@ -84,7 +84,7 @@ export default function App() {
   // Listen for product updates when connected
   useEffect(() => {
     if (isConnected && sessionId) {
-      const handleProductUpdate = (updatedProducts: any) => {
+      const handleProductUpdate = (updatedProducts: ProductItem[]) => {
         console.log("📦 Received product update");
         setProducts(updatedProducts);
       };
@@ -100,7 +100,7 @@ export default function App() {
     if (showQRCode && sessionId) {
       const timer = setTimeout(() => {
         const qrContainer = document.getElementById('qrcode');
-        if (qrContainer && !qrContainer.hasChildNodes()) {
+        if (qrContainer && !qrContainer.hasChildNodes() && typeof QRCode !== 'undefined') {
           new QRCode(qrContainer, {
             text: `${window.location.origin}?session=${sessionId}`,
             width: 256,

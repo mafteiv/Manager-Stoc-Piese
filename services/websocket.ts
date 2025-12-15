@@ -15,6 +15,17 @@ export interface SessionData {
   createdAt: number;
 }
 
+interface CreateSessionResponse {
+  success: boolean;
+  error?: string;
+}
+
+interface JoinSessionResponse {
+  success: boolean;
+  data?: SessionData;
+  error?: string;
+}
+
 // Initialize socket connection
 export const connectSocket = (): Socket => {
   if (!socket) {
@@ -44,7 +55,7 @@ export const connectSocket = (): Socket => {
 export const createSession = (sessionId: string, data: SessionData): Promise<boolean> => {
   return new Promise((resolve, reject) => {
     const s = connectSocket();
-    s.emit('create-session', { sessionId, data }, (response: any) => {
+    s.emit('create-session', { sessionId, data }, (response: CreateSessionResponse) => {
       if (response.success) {
         console.log('✅ Session created:', sessionId);
         resolve(true);
@@ -60,7 +71,7 @@ export const createSession = (sessionId: string, data: SessionData): Promise<boo
 export const joinSession = (sessionId: string): Promise<SessionData> => {
   return new Promise((resolve, reject) => {
     const s = connectSocket();
-    s.emit('join-session', { sessionId }, (response: any) => {
+    s.emit('join-session', { sessionId }, (response: JoinSessionResponse) => {
       if (response.success && response.data) {
         console.log('✅ Joined session:', sessionId);
         s.emit('subscribe-session', { sessionId });
