@@ -1,4 +1,4 @@
-import { read, utils, writeFile } from 'xlsx';
+declare const XLSX: any;
 import { ProductItem } from '../types';
 
 // Helper to read file as ArrayBuffer
@@ -17,9 +17,9 @@ export const readExcelRaw = async (file: File): Promise<any[][]> => {
     console.log("Începere citire fișier...");
     const data = await readFile(file);
     
-    // Folosim funcția 'read' importată direct, nu prin obiectul XLSX
+    // Folosim obiectul global XLSX carcat din CDN
     // Aceasta rezolvă problemele de împachetare din Vite/Production
-    const workbook = read(data, { type: 'array' });
+    const workbook = XLSX.read(data, { type: 'array' });
     
     const firstSheetName = workbook.SheetNames[0];
     if (!firstSheetName) throw new Error("Fișierul Excel nu are nicio foaie de lucru.");
@@ -27,10 +27,11 @@ export const readExcelRaw = async (file: File): Promise<any[][]> => {
     const worksheet = workbook.Sheets[firstSheetName];
     
     // Get data as array of arrays
-    const jsonData = utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
+    const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
+    console.log("✅ Fișier citit cu succes! Rânduri:", jsonData.length);
     return jsonData;
   } catch (error) {
-    console.error("XLSX Read Error:", error);
+    console.error("❌ XLSX Read Error:", error);
     // Aruncăm o eroare mai clară
     throw new Error(error instanceof Error ? error.message : "Eroare necunoscută la procesarea Excel");
   }
@@ -124,21 +125,21 @@ export const exportToExcel = (
     finalData.push(rowData);
   });
 
-  const worksheet = utils.aoa_to_sheet(finalData);
+  const worksheet = XLSX.utils.aoa_to_sheet(finalData);
 
   // --- APLICARE CULORI (Dacă avem stiluri disponibile) ---
   if (worksheet['!ref']) {
-      const range = utils.decode_range(worksheet['!ref']);
+      const range = XLSX.utils.decode_range(worksheet['!ref']);
       const lastColIdx = finalHeader.length - 1; 
       const scripticColIdx = mapping.stockIndex; 
 
       for (let R = 1; R <= range.e.r; ++R) {
-        const actualCellAddr = utils.encode_cell({r: R, c: lastColIdx});
+        const actualCellAddr = XLSX.utils.encode_cell({r: R, c: lastColIdx});
         const actualCell = worksheet[actualCellAddr];
 
         let scripticVal = 0;
         if (scripticColIdx !== -1) {
-            const scripticCellAddr = utils.encode_cell({r: R, c: scripticColIdx});
+            const scripticCellAddr = XLSX.utils.encode_cell({r: R, c: scripticColIdx});
             const scripticCell = worksheet[scripticCellAddr];
             if (scripticCell && scripticCell.v) {
                 scripticVal = parseInt(String(scripticCell.v), 10) || 0;
@@ -152,11 +153,11 @@ export const exportToExcel = (
       }
   }
 
-  const workbook = utils.book_new();
-  utils.book_append_sheet(workbook, worksheet, "Inventar");
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Inventar");
 
   const namePart = fileName.split('.')[0] || "inventar";
   const newFileName = `${namePart}_actualizat_${new Date().toISOString().slice(0,10)}.xlsx`;
 
-  writeFile(workbook, newFileName);
+  XLSX.writeFile(workbook, newFileName);
 };
