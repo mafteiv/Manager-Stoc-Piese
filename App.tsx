@@ -5,6 +5,9 @@ import { ProductItem } from './types';
 import { ScannerListener } from './components/ScannerListener';
 import { QuantityModal } from './components/QuantityModal';
 
+// Constants
+const QR_MODAL_AUTO_CLOSE_DELAY = 10000; // 10 seconds
+
 export default function App() {
   // --- STATE PRINCIPAL ---
   const [products, setProducts] = useState<ProductItem[]>([]);
@@ -164,7 +167,7 @@ export default function App() {
 
   // --- ACTIUNI ---
 
-  const handleJoinSession = async () => {
+  const handleJoinSession = () => {
     if (!joinSessionId) {
         console.log("⚠️ No session ID entered");
         setErrorMsg("Introdu un cod de sesiune.");
@@ -277,11 +280,11 @@ export default function App() {
         console.log("✅ Session created in localStorage!");
         console.log("✅ AppMode set to ACTIVE");
         
-        // Auto-close QR modal after 10 seconds
+        // Auto-close QR modal after delay
         qrModalTimeoutRef.current = setTimeout(() => {
             console.log("🔄 Auto-closing QR modal...");
             setShowQRCode(false);
-        }, 10000);
+        }, QR_MODAL_AUTO_CLOSE_DELAY);
         
     } catch (err: any) {
         console.error("❌ Mapping error:", err);
