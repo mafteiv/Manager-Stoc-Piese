@@ -19,6 +19,7 @@ export default function App() {
   // Polling state for localStorage sync
   const [lastKnownUpdate, setLastKnownUpdate] = useState<number>(0);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const qrModalTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Import State
   const [fileName, setFileName] = useState<string>("");
@@ -133,12 +134,29 @@ export default function App() {
         }
       }, 100);
       
+      // Handle keyboard events
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') {
+          if (qrModalTimeoutRef.current) {
+            clearTimeout(qrModalTimeoutRef.current);
+          }
+          setShowQRCode(false);
+        }
+      };
+      
+      document.addEventListener('keydown', handleKeyDown);
+      
       return () => {
         clearTimeout(timer);
+        document.removeEventListener('keydown', handleKeyDown);
         // Clear QR code container when modal closes
         const qrContainer = document.getElementById('qrcode');
         if (qrContainer) {
           qrContainer.innerHTML = '';
+        }
+        // Clear auto-close timeout when modal is manually closed
+        if (qrModalTimeoutRef.current) {
+          clearTimeout(qrModalTimeoutRef.current);
         }
       };
     }
@@ -260,7 +278,7 @@ export default function App() {
         console.log("✅ AppMode set to ACTIVE");
         
         // Auto-close QR modal after 10 seconds
-        setTimeout(() => {
+        qrModalTimeoutRef.current = setTimeout(() => {
             console.log("🔄 Auto-closing QR modal...");
             setShowQRCode(false);
         }, 10000);
@@ -392,9 +410,20 @@ export default function App() {
 
       {/* QR Code Modal */}
       {showQRCode && sessionId && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setShowQRCode(false)}>
+          <div 
+              className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" 
+              onClick={() => {
+                  if (qrModalTimeoutRef.current) {
+                      clearTimeout(qrModalTimeoutRef.current);
+                  }
+                  setShowQRCode(false);
+              }}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="qr-modal-title"
+          >
               <div className="bg-white p-8 rounded-2xl shadow-2xl max-w-md" onClick={(e) => e.stopPropagation()}>
-                  <h2 className="text-2xl font-bold mb-4 text-center">📱 Scanează pentru conectare</h2>
+                  <h2 id="qr-modal-title" className="text-2xl font-bold mb-4 text-center">📱 Scanează pentru conectare</h2>
                   <div id="qrcode" className="flex justify-center mb-4"></div>
                   <div className="text-center">
                       <p className="text-gray-600 mb-2">Cod sesiune:</p>
@@ -404,9 +433,13 @@ export default function App() {
                   <button 
                       onClick={() => {
                           console.log("🔄 Closing QR modal manually...");
+                          if (qrModalTimeoutRef.current) {
+                              clearTimeout(qrModalTimeoutRef.current);
+                          }
                           setShowQRCode(false);
                       }} 
                       className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 transition"
+                      aria-label="Close QR code modal and view products"
                   >
                       Închide și Vezi Produsele
                   </button>
