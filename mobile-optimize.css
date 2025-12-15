@@ -1,6 +1,5 @@
 /* Mobile Optimization Styles */
 
-/* Prevent zoom on input focus */
 @media (max-width: 768px) {
   input, select, textarea, button {
     font-size: 16px !important;
@@ -142,4 +141,3 @@
     height: 150px !important;
   }
 }
-
