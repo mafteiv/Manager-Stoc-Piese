@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { readExcelRaw, mapDataToProducts, exportToExcel } from './services/xlsxService';
-import { createSession, subscribeToSession, updateSessionProducts, checkSessionExists } from './services/firebase';
+import { connectSocket, createSession as createWSSession, joinSession, onProductsUpdate, updateProducts } from './services/websocket';
 import { ProductItem } from './types';
 import { ScannerListener } from './components/ScannerListener';
 import { QuantityModal } from './components/QuantityModal';
@@ -12,7 +12,8 @@ export default function App() {
   
   // Cloud State
   const [sessionId, setSessionId] = useState("");
-  const [isCloudSyncing, setIsCloudSyncing] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
+  const [showQRCode, setShowQRCode] = useState(false);
   const [joinSessionId, setJoinSessionId] = useState("");
 
   // Import State
@@ -45,49 +46,104 @@ export default function App() {
     }
   }, [highlightedId]);
 
+  // Auto-join session from URL parameter
   useEffect(() => {
-    if (isCloudSyncing && sessionId) {
-        const unsubscribe = subscribeToSession(sessionId, (data) => {
-            if (data) {
-                setProducts(data.products || []);
-                setFileName(data.fileName);
-                setOriginalHeaders(data.originalHeaders);
-                setColumnMapping(data.columnMapping);
+    const urlParams = new URLSearchParams(window.location.search);
+    const sessionParam = urlParams.get('session');
+    
+    if (sessionParam) {
+        setJoinSessionId(sessionParam);
+        setErrorMsg(null);
+        
+        console.log(`🔍 Auto-joining session from URL: ${sessionParam}`);
+        
+        // Auto-join
+        setTimeout(async () => {
+            try {
+                const sessionData = await joinSession(sessionParam);
+                
+                setSessionId(sessionParam);
+                setFileName(sessionData.fileName);
+                setProducts(sessionData.products);
+                setOriginalHeaders(sessionData.originalHeaders);
+                setColumnMapping(sessionData.columnMapping);
+                setIsConnected(true);
+                setAppMode('ACTIVE');
+                
+                console.log("✅ Successfully auto-joined session!");
+                
+            } catch (e: any) {
+                console.error("❌ Auto-join error:", e);
+                setErrorMsg(e.message || "Sesiunea nu există.");
             }
-        });
-        return () => unsubscribe();
+        }, 500);
     }
-  }, [isCloudSyncing, sessionId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Listen for product updates when connected
+  useEffect(() => {
+    if (isConnected && sessionId) {
+      const handleProductUpdate = (updatedProducts: ProductItem[]) => {
+        console.log("📦 Received product update");
+        setProducts(updatedProducts);
+      };
+
+      const cleanup = onProductsUpdate(handleProductUpdate);
+
+      return cleanup;
+    }
+  }, [isConnected, sessionId]);
+
+  // Generate QR code when modal opens
+  useEffect(() => {
+    if (showQRCode && sessionId) {
+      const timer = setTimeout(() => {
+        const qrContainer = document.getElementById('qrcode');
+        if (qrContainer && !qrContainer.hasChildNodes() && typeof QRCode !== 'undefined') {
+          new QRCode(qrContainer, {
+            text: `${window.location.origin}?session=${sessionId}`,
+            width: 256,
+            height: 256
+          });
+        }
+      }, 100);
+      
+      return () => {
+        clearTimeout(timer);
+        // Clear QR code container when modal closes
+        const qrContainer = document.getElementById('qrcode');
+        if (qrContainer) {
+          qrContainer.innerHTML = '';
+        }
+      };
+    }
+  }, [showQRCode, sessionId]);
 
   // --- ACTIUNI ---
-
-  const handleStartCloudSession = async () => {
-    if (!products.length) return;
-    const newSessionId = Math.floor(1000 + Math.random() * 9000).toString();
-    try {
-        await createSession(newSessionId, products, fileName, originalHeaders, columnMapping);
-        setSessionId(newSessionId);
-        setIsCloudSyncing(true);
-        setAppMode('ACTIVE');
-    } catch (e: any) {
-        setErrorMsg("Eroare Firebase: " + e.message);
-    }
-  };
 
   const handleJoinSession = async () => {
     if (!joinSessionId) return;
     setErrorMsg(null);
+    
+    console.log(`🔍 Attempting to join session: ${joinSessionId}`);
+    
     try {
-        const exists = await checkSessionExists(joinSessionId);
-        if (exists) {
-            setSessionId(joinSessionId);
-            setIsCloudSyncing(true);
-            setAppMode('ACTIVE');
-        } else {
-            setErrorMsg("Sesiunea nu există.");
-        }
-    } catch (e) {
-        setErrorMsg("Eroare conexiune.");
+        const sessionData = await joinSession(joinSessionId);
+        
+        setSessionId(joinSessionId);
+        setFileName(sessionData.fileName);
+        setProducts(sessionData.products);
+        setOriginalHeaders(sessionData.originalHeaders);
+        setColumnMapping(sessionData.columnMapping);
+        setIsConnected(true);
+        setAppMode('ACTIVE');
+        
+        console.log("✅ Successfully joined session!");
+        
+    } catch (e: any) {
+        console.error("❌ Join error:", e);
+        setErrorMsg(e.message || "Sesiunea nu există.");
     }
   };
 
@@ -125,28 +181,60 @@ export default function App() {
     }
   };
 
-  const handleConfirmMapping = () => {
+  const handleConfirmMapping = async () => {
     if (!rawExcelData) return;
+    
+    console.log("🔄 Starting mapping confirmation...");
+    
     try {
         const items = mapDataToProducts(rawExcelData, columnMapping);
+        console.log(`✅ Mapped ${items.length} products`);
+        
         if (items.length === 0) {
             setErrorMsg("Nu s-au putut extrage produse. Verifică coloanele selectate.");
             return;
         }
+        
         setOriginalHeaders(rawExcelData[0] || []);
         setProducts(items);
         setRawExcelData(null);
-        // Pornim sesiunea imediat după mapare
-        setTimeout(handleStartCloudSession, 100);
+        
+        // Generate session ID and create WebSocket session
+        const newSessionId = Math.floor(1000 + Math.random() * 9000).toString();
+        console.log(`🔑 Generated session ID: ${newSessionId}`);
+        
+        try {
+            await createWSSession(newSessionId, {
+                sessionId: newSessionId,
+                fileName,
+                products: items,
+                originalHeaders: rawExcelData[0] || [],
+                columnMapping,
+                createdAt: Date.now()
+            });
+            
+            setSessionId(newSessionId);
+            setIsConnected(true);
+            setShowQRCode(true);
+            setAppMode('ACTIVE');
+            
+            console.log("✅ Session created successfully!");
+            
+        } catch (err: any) {
+            console.error("❌ WebSocket error:", err);
+            setErrorMsg(`Eroare conexiune: ${err.message}`);
+        }
+        
     } catch (err: any) {
+        console.error("❌ Mapping error:", err);
         setErrorMsg(`Eroare la mapare: ${err.message}`);
     }
   };
 
   const pushUpdateToCloud = (newProducts: ProductItem[]) => {
       setProducts(newProducts);
-      if (isCloudSyncing && sessionId) {
-          updateSessionProducts(sessionId, newProducts).catch(console.error);
+      if (isConnected && sessionId) {
+          updateProducts(sessionId, newProducts);
       }
   };
 
@@ -256,6 +344,26 @@ export default function App() {
         />
       )}
 
+      {/* QR Code Modal */}
+      {showQRCode && sessionId && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-white p-8 rounded-2xl shadow-2xl max-w-md">
+                  <h2 className="text-2xl font-bold mb-4 text-center">📱 Scanează pentru conectare</h2>
+                  <div id="qrcode" className="flex justify-center mb-4"></div>
+                  <div className="text-center">
+                      <p className="text-gray-600 mb-2">Cod sesiune:</p>
+                      <p className="text-4xl font-bold text-blue-600">{sessionId}</p>
+                  </div>
+                  <button 
+                      onClick={() => setShowQRCode(false)} 
+                      className="w-full mt-6 bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700"
+                  >
+                      Închide
+                  </button>
+              </div>
+          </div>
+      )}
+
       {/* HEADER */}
       <header className="bg-blue-600 text-white shadow-md z-30 shrink-0">
         <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
@@ -263,7 +371,7 @@ export default function App() {
             <h1 className="text-lg md:text-xl font-bold flex items-center gap-2">
               <span>📦</span> BookWay Manager
             </h1>
-            {isCloudSyncing ? (
+            {isConnected ? (
                 <div className="flex items-center gap-2 mt-1">
                     <span className="flex h-3 w-3 relative">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
