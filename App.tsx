@@ -397,10 +397,12 @@ export default function App() {
     <div className="flex flex-col h-screen bg-gray-100 text-gray-800 font-sans overflow-hidden">
       <ScannerListener onScan={handleScan} />
 
-      {/* Temporary debug indicator - remove after testing */}
-      <div className="fixed top-0 right-0 bg-black text-white px-4 py-2 text-xs z-50">
-        Mode: {appMode} | Session: {sessionId || 'none'}
-      </div>
+      {/* Debug indicator for development */}
+      {import.meta.env.DEV && (
+        <div className="fixed top-0 right-0 bg-black text-white px-4 py-2 text-xs z-50">
+          Mode: {appMode} | Session: {sessionId || 'none'}
+        </div>
+      )}
 
       {selectedProduct && (
         <QuantityModal 
