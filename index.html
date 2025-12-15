@@ -31,7 +31,12 @@
 }
 </script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<!-- QR Code library: Integrity check removed due to CDN hash mismatch issues.
+     Consider hosting this library locally for better security. -->
+<script 
+  src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"
+  crossorigin="anonymous"
+></script>
 <link rel="stylesheet" href="/index.css">
 </head>
 <body class="bg-gray-50 text-gray-800 antialiased">
