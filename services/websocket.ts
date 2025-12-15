@@ -1,8 +1,8 @@
 import { io, Socket } from 'socket.io-client';
 import { ProductItem } from '../types';
 
-// Server URL - will be updated with actual Railway URL
-const SOCKET_SERVER = 'https://manager-stoc-piese-server.up.railway.app';
+// Server URL - Render.com deployment
+const SOCKET_SERVER = 'https://manager-stoc-piese-server.onrender.com';
 
 let socket: Socket | null = null;
 
