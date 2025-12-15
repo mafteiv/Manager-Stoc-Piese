@@ -8,7 +8,7 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: '*',
+    origin: '*', // TODO: Restrict to specific domains in production (e.g., ['https://yourdomain.com'])
     methods: ['GET', 'POST']
   }
 });

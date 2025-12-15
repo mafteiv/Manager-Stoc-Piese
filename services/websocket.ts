@@ -10,8 +10,12 @@ export interface SessionData {
   sessionId: string;
   fileName: string;
   products: ProductItem[];
-  originalHeaders: any[];
-  columnMapping: any;
+  originalHeaders: string[];
+  columnMapping: {
+    codeIndex: number;
+    descIndex: number;
+    stockIndex: number;
+  };
   createdAt: number;
 }
 
@@ -73,9 +77,12 @@ export const joinSession = (sessionId: string): Promise<SessionData> => {
 };
 
 // Both: Listen for real-time product updates
+// Note: We remove previous listeners to prevent duplicates. This is safe because
+// this function is only called when joining/creating a session, and we only want
+// one active listener at a time.
 export const onProductsUpdate = (callback: (products: ProductItem[]) => void): void => {
   const s = connectSocket();
-  s.off('products-updated'); // Remove previous listeners
+  s.off('products-updated'); // Remove previous listeners to prevent duplicates
   s.on('products-updated', (data: { products: ProductItem[] }) => {
     console.log('📦 Products updated from server');
     callback(data.products);
