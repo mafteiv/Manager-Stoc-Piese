@@ -59,8 +59,9 @@
   }
 
   #qrcode {
-    width: 200px !important;
-    height: 200px !important;
+    width: 320px !important;
+    height: 320px !important;
+    margin: 0 auto !important;
   }
 
   #qrcode canvas,
@@ -141,3 +142,4 @@
     height: 150px !important;
   }
 }
+

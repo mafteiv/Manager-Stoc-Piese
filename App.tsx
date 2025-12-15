@@ -64,9 +64,9 @@ export default function App() {
         // Auto-join
         setTimeout(async () => {
             try {
-                const sessionData = await joinSession(sessionParam);
+                const sessionData = await joinSession(cleanSessionId);
                 
-                setSessionId(sessionParam);
+                setSessionId(cleanSessionId);
                 setFileName(sessionData.fileName);
                 setProducts(sessionData.products);
                 setOriginalHeaders(sessionData.originalHeaders);
@@ -105,8 +105,11 @@ export default function App() {
         if (qrContainer && !qrContainer.hasChildNodes() && typeof QRCode !== 'undefined') {
           new QRCode(qrContainer, {
             text: `${window.location.origin}${window.location.pathname}?session=${sessionId}`,
-            width: 256,
-            height: 256
+            width: 320,
+            height: 320,
+            colorDark: '#000000',
+            colorLight: '#ffffff',
+            correctLevel: 2
           });
         }
       }, 100);
@@ -680,6 +683,9 @@ export default function App() {
     </div>
   );
 }
+
+
+
 
 
 
