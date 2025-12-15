@@ -4,10 +4,43 @@
 This document describes how to manually test the new WebSocket-based synchronization system.
 
 ## Prerequisites
-1. Start the development server: `npm run dev`
-2. Open the application in two browser windows/tabs:
+1. **Deploy the Socket.IO server to Railway.app** (see Server Deployment section below)
+2. Update `SOCKET_SERVER` URL in `services/websocket.ts` with your Railway deployment URL
+3. Rebuild the app: `npm run build`
+4. Start the development server: `npm run dev`
+5. Open the application in two browser windows/tabs:
    - **Window 1**: Desktop mode (for uploading Excel)
    - **Window 2**: Zebra/Scanner mode (for joining session)
+
+## Server Deployment
+
+### Option A: Deploy to Railway.app (Recommended)
+1. Create a new GitHub repository: `Manager-Stoc-Piese-Server`
+2. Copy all files from the `server/` directory to this new repository
+3. Go to [Railway.app](https://railway.app/) and sign in with GitHub
+4. Click "New Project" → "Deploy from GitHub repo"
+5. Select your `Manager-Stoc-Piese-Server` repository
+6. Railway will auto-detect the `package.json` and deploy automatically
+7. Once deployed, copy the deployment URL (e.g., `https://manager-stoc-piese-server.up.railway.app`)
+8. Update `SOCKET_SERVER` in `services/websocket.ts`:
+   ```typescript
+   const SOCKET_SERVER = 'https://your-railway-url.up.railway.app';
+   ```
+9. Rebuild the client app: `npm run build`
+
+### Option B: Local Testing (Development Only)
+1. In a separate terminal, navigate to the server directory:
+   ```bash
+   cd server
+   npm install
+   npm start
+   ```
+2. Server will run on `http://localhost:3000`
+3. Update `SOCKET_SERVER` in `services/websocket.ts`:
+   ```typescript
+   const SOCKET_SERVER = 'http://localhost:3000';
+   ```
+4. Rebuild the client app: `npm run build`
 
 ## Test Scenario 1: Desktop Creates Session
 
@@ -141,17 +174,19 @@ This document describes how to manually test the new WebSocket-based synchroniza
 
 ## Known Limitations
 
-1. **WebSocket Server**: Using a public test server (`socket-io-server.up.railway.app`)
-   - Sessions may not persist long-term
-   - For production, deploy your own Socket.IO server
+1. **WebSocket Server**: The server URL in `services/websocket.ts` is set to Railway deployment
+   - Sessions are stored in memory and will be lost on server restart
+   - For production, consider implementing Redis or database persistence
+   - Update the URL to match your actual Railway deployment
 
 2. **QR Code**: QRCode library is loaded from CDN
    - Requires internet connection
-   - Alternative: Install as npm package
+   - Using unpkg.com CDN for reliability
 
 3. **Session Expiry**: Sessions are stored in server memory
    - Sessions will be lost if server restarts
    - For production, implement session persistence (Redis, database, etc.)
+   - Consider adding automatic session cleanup (e.g., expire after 24 hours)
 
 ## Troubleshooting
 
