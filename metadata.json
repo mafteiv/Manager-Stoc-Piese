@@ -1,0 +1,5 @@
+{
+  "name": "Manager Stoc Piese Imprimantă",
+  "description": "O aplicație pentru gestionarea inventarului pieselor de schimb. Permite importul Excel, scanarea codurilor de bare pentru actualizarea stocului faptic și exportul rezultatelor.",
+  "requestFramePermissions": []
+}
