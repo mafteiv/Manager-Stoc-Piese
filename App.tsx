@@ -453,7 +453,7 @@ export default function App() {
                 <p className="text-blue-200 text-xs">Offline - Încarcă Excel pentru a începe</p>
             )}
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-1 sm:gap-2 flex-col sm:flex-row">
             {appMode === 'ACTIVE' && (
                 <button 
                     onClick={() => exportToExcel(products, fileName, originalHeaders, columnMapping)} 
@@ -474,7 +474,7 @@ export default function App() {
         
         {/* VIEW 1: SETUP */}
         {appMode === 'SETUP' && (
-            <div className="max-w-lg mx-auto grid gap-8 mt-10">
+            <div className="w-full max-w-lg mx-auto grid gap-3 sm:gap-8 mt-4 sm:mt-10 px-2 sm:px-0">
                 {errorMsg && (
                     <div 
                         className="max-w-2xl mx-auto bg-red-100 border-2 border-red-500 text-red-700 px-6 py-4 rounded-xl shadow-lg"
@@ -490,10 +490,10 @@ export default function App() {
                         </div>
                     </div>
                 )}
-                <div className="bg-white p-8 rounded-2xl shadow-xl border border-blue-100 text-center transition hover:shadow-2xl">
-                    <div className="text-5xl mb-4">🖥️</div>
-                    <h2 className="text-2xl font-bold text-gray-800 mb-2">PC / Laptop</h2>
-                    <p className="text-gray-500 mb-6">Încarcă fișierul Excel de la contabilitate pentru a genera o sesiune de scanare.</p>
+                <div className="bg-white p-4 sm:p-8 rounded-lg sm:rounded-2xl shadow-lg sm:shadow-xl border border-blue-100 text-center transition hover:shadow-lg sm:hover:shadow-2xl">
+                    <div className="text-4xl sm:text-5xl mb-2 sm:mb-4">🖥️</div>
+                    <h2 className="text-xl sm:text-2xl font-bold text-gray-800 mb-1 sm:mb-2">PC / Laptop</h2>
+                    <p className="text-sm sm:text-base text-gray-500 mb-3 sm:mb-6">Încarcă fișierul Excel de la contabilitate pentru a genera o sesiune de scanare.</p>
                     
                     <label className="block w-full cursor-pointer bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white py-4 rounded-xl font-bold shadow-lg transition transform hover:scale-[1.02]">
                         📂 Încarcă Fișier Excel
@@ -501,25 +501,25 @@ export default function App() {
                     </label>
                 </div>
 
-                <div className="relative flex py-2 items-center">
+                <div className="relative flex py-1 sm:py-2 items-center">
                     <div className="flex-grow border-t border-gray-300"></div>
                     <span className="flex-shrink-0 mx-4 text-gray-400 font-bold text-sm">SAU CONECTEAZĂ-TE</span>
                     <div className="flex-grow border-t border-gray-300"></div>
                 </div>
 
-                <div className="bg-white p-8 rounded-2xl shadow-xl border border-gray-200 text-center">
-                    <div className="text-5xl mb-4">📱</div>
-                    <h2 className="text-2xl font-bold text-gray-800 mb-2">Scanner / Zebra</h2>
-                    <p className="text-gray-500 mb-6">Introdu codul sesiunii creat pe PC.</p>
-                    <div className="flex gap-2">
-                        <input 
-                            type="number" 
-                            placeholder="Cod Sesiune (ex: 1234)" 
-                            className="flex-1 border-2 border-gray-300 rounded-xl p-3 text-center text-xl font-bold focus:border-blue-500 focus:outline-none"
+                <div className="bg-white p-4 sm:p-8 rounded-lg sm:rounded-2xl shadow-lg sm:shadow-xl border border-gray-200 text-center">
+                    <div className="text-4xl sm:text-5xl mb-2 sm:mb-4">📱</div>
+                    <h2 className="text-xl sm:text-2xl font-bold text-gray-800 mb-1 sm:mb-2">Scanner / Zebra</h2>
+                    <p className="text-sm sm:text-base text-gray-500 mb-3 sm:mb-6">Introdu codul sesiunii creat pe PC.</p>
+                    <div className="flex gap-1 sm:gap-2 flex-col sm:flex-row">
+                        <input
+                              type="number"
+                              placeholder="Cod Sesiune (ex: 1234)"
+                              className="flex-1 border-2 border-gray-300 rounded-lg sm:rounded-xl p-2 sm:p-3 text-center text-lg sm:text-xl font-bold focus:border-blue-500 focus:outline-none"
                             value={joinSessionId}
                             onChange={(e) => setJoinSessionId(e.target.value)}
                         />
-                        <button onClick={handleJoinSession} className="bg-green-600 hover:bg-green-700 text-white px-6 rounded-xl font-bold shadow-lg transition">START</button>
+                        <button onClick={handleJoinSession} className="bg-green-600 hover:bg-green-700 text-white px-6 sm:px-8 py-2 sm:py-3 rounded-lg sm:rounded-xl font-bold shadow-lg transition w-full sm:w-auto">START</button>
                     </div>
                 </div>
             </div>
@@ -680,6 +680,8 @@ export default function App() {
     </div>
   );
 }
+
+
 
 
 
