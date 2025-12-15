@@ -496,9 +496,13 @@ export default function App() {
         {appMode === 'SETUP' && (
             <div className="max-w-lg mx-auto grid gap-8 mt-10">
                 {errorMsg && (
-                    <div className="max-w-2xl mx-auto bg-red-100 border-2 border-red-500 text-red-700 px-6 py-4 rounded-xl shadow-lg">
+                    <div 
+                        className="max-w-2xl mx-auto bg-red-100 border-2 border-red-500 text-red-700 px-6 py-4 rounded-xl shadow-lg"
+                        role="alert"
+                        aria-live="polite"
+                    >
                         <div className="flex items-center gap-3">
-                            <span className="text-3xl">❌</span>
+                            <span className="text-3xl" aria-hidden="true">❌</span>
                             <div>
                                 <p className="font-bold text-lg">Eroare:</p>
                                 <p>{errorMsg}</p>
