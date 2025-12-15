@@ -17,7 +17,7 @@ export const readExcelRaw = async (file: File): Promise<any[][]> => {
     console.log("Începere citire fișier...");
     const data = await readFile(file);
     
-    // Folosim funcția 'read' din obiectul global XLSX
+    // Folosim obiectul global XLSX carcat din CDN
     // Aceasta rezolvă problemele de împachetare din Vite/Production
     const workbook = XLSX.read(data, { type: 'array' });
     
