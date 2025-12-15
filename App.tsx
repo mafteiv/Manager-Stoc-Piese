@@ -5,6 +5,9 @@ import { ProductItem } from './types';
 import { ScannerListener } from './components/ScannerListener';
 import { QuantityModal } from './components/QuantityModal';
 
+// Constants
+const QR_MODAL_AUTO_CLOSE_DELAY = 10000; // 10 seconds
+
 export default function App() {
   // --- STATE PRINCIPAL ---
   const [products, setProducts] = useState<ProductItem[]>([]);
@@ -19,6 +22,7 @@ export default function App() {
   // Polling state for localStorage sync
   const [lastKnownUpdate, setLastKnownUpdate] = useState<number>(0);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const qrModalTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Import State
   const [fileName, setFileName] = useState<string>("");
@@ -133,12 +137,29 @@ export default function App() {
         }
       }, 100);
       
+      // Handle keyboard events
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') {
+          if (qrModalTimeoutRef.current) {
+            clearTimeout(qrModalTimeoutRef.current);
+          }
+          setShowQRCode(false);
+        }
+      };
+      
+      document.addEventListener('keydown', handleKeyDown);
+      
       return () => {
         clearTimeout(timer);
+        document.removeEventListener('keydown', handleKeyDown);
         // Clear QR code container when modal closes
         const qrContainer = document.getElementById('qrcode');
         if (qrContainer) {
           qrContainer.innerHTML = '';
+        }
+        // Clear auto-close timeout when modal is manually closed
+        if (qrModalTimeoutRef.current) {
+          clearTimeout(qrModalTimeoutRef.current);
         }
       };
     }
@@ -147,9 +168,13 @@ export default function App() {
   // --- ACTIUNI ---
 
   const handleJoinSession = () => {
-    if (!joinSessionId) return;
-    setErrorMsg(null);
+    if (!joinSessionId) {
+        console.log("⚠️ No session ID entered");
+        setErrorMsg("Introdu un cod de sesiune.");
+        return;
+    }
     
+    setErrorMsg(null);
     console.log(`🔍 Attempting to join session: ${joinSessionId}`);
     
     if (!sessionExists(joinSessionId)) {
@@ -161,8 +186,11 @@ export default function App() {
     const sessionData = getSession(joinSessionId);
     if (!sessionData) {
         setErrorMsg("Eroare la încărcarea sesiunii.");
+        console.error("❌ Failed to load session data");
         return;
     }
+    
+    console.log("✅ Session data loaded:", sessionData);
     
     setSessionId(joinSessionId);
     setFileName(sessionData.fileName);
@@ -173,7 +201,8 @@ export default function App() {
     setIsConnected(true);
     setAppMode('ACTIVE');
     
-    console.log("✅ Successfully joined session!");
+    console.log("✅ Successfully joined session! AppMode set to ACTIVE");
+    console.log("✅ Products loaded:", sessionData.products.length);
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -249,6 +278,13 @@ export default function App() {
         setAppMode('ACTIVE');
         
         console.log("✅ Session created in localStorage!");
+        console.log("✅ AppMode set to ACTIVE");
+        
+        // Auto-close QR modal after delay
+        qrModalTimeoutRef.current = setTimeout(() => {
+            console.log("🔄 Auto-closing QR modal...");
+            setShowQRCode(false);
+        }, QR_MODAL_AUTO_CLOSE_DELAY);
         
     } catch (err: any) {
         console.error("❌ Mapping error:", err);
@@ -361,6 +397,13 @@ export default function App() {
     <div className="flex flex-col h-screen bg-gray-100 text-gray-800 font-sans overflow-hidden">
       <ScannerListener onScan={handleScan} />
 
+      {/* Debug indicator for development */}
+      {import.meta.env.DEV && (
+        <div className="fixed top-0 right-0 bg-black text-white px-4 py-2 text-xs z-50">
+          Mode: {appMode} | Session: {sessionId || 'none'}
+        </div>
+      )}
+
       {selectedProduct && (
         <QuantityModal 
             product={selectedProduct}
@@ -372,19 +415,38 @@ export default function App() {
 
       {/* QR Code Modal */}
       {showQRCode && sessionId && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-              <div className="bg-white p-8 rounded-2xl shadow-2xl max-w-md">
-                  <h2 className="text-2xl font-bold mb-4 text-center">📱 Scanează pentru conectare</h2>
+          <div 
+              className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" 
+              onClick={() => {
+                  if (qrModalTimeoutRef.current) {
+                      clearTimeout(qrModalTimeoutRef.current);
+                  }
+                  setShowQRCode(false);
+              }}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="qr-modal-title"
+          >
+              <div className="bg-white p-8 rounded-2xl shadow-2xl max-w-md" onClick={(e) => e.stopPropagation()}>
+                  <h2 id="qr-modal-title" className="text-2xl font-bold mb-4 text-center">📱 Scanează pentru conectare</h2>
                   <div id="qrcode" className="flex justify-center mb-4"></div>
                   <div className="text-center">
                       <p className="text-gray-600 mb-2">Cod sesiune:</p>
-                      <p className="text-4xl font-bold text-blue-600">{sessionId}</p>
+                      <p className="text-4xl font-bold text-blue-600 mb-4">{sessionId}</p>
+                      <p className="text-sm text-gray-500 mb-4">Sesiunea a fost creată! Apasă "Închide" pentru a vedea produsele.</p>
                   </div>
                   <button 
-                      onClick={() => setShowQRCode(false)} 
-                      className="w-full mt-6 bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700"
+                      onClick={() => {
+                          console.log("🔄 Closing QR modal manually...");
+                          if (qrModalTimeoutRef.current) {
+                              clearTimeout(qrModalTimeoutRef.current);
+                          }
+                          setShowQRCode(false);
+                      }} 
+                      className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 transition"
+                      aria-label="Close QR code modal and view products"
                   >
-                      Închide
+                      Închide și Vezi Produsele
                   </button>
               </div>
           </div>
@@ -433,6 +495,21 @@ export default function App() {
         {/* VIEW 1: SETUP */}
         {appMode === 'SETUP' && (
             <div className="max-w-lg mx-auto grid gap-8 mt-10">
+                {errorMsg && (
+                    <div 
+                        className="max-w-2xl mx-auto bg-red-100 border-2 border-red-500 text-red-700 px-6 py-4 rounded-xl shadow-lg"
+                        role="alert"
+                        aria-live="polite"
+                    >
+                        <div className="flex items-center gap-3">
+                            <span className="text-3xl" aria-hidden="true">❌</span>
+                            <div>
+                                <p className="font-bold text-lg">Eroare:</p>
+                                <p>{errorMsg}</p>
+                            </div>
+                        </div>
+                    </div>
+                )}
                 <div className="bg-white p-8 rounded-2xl shadow-xl border border-blue-100 text-center transition hover:shadow-2xl">
                     <div className="text-5xl mb-4">🖥️</div>
                     <h2 className="text-2xl font-bold text-gray-800 mb-2">PC / Laptop</h2>
@@ -442,13 +519,6 @@ export default function App() {
                         📂 Încarcă Fișier Excel
                         <input type="file" accept=".xlsx, .xls" onChange={handleFileUpload} className="hidden" />
                     </label>
-                    
-                    {errorMsg && (
-                        <div className="bg-red-50 border-l-4 border-red-500 p-4 mt-6 text-left rounded">
-                            <p className="text-red-800 font-bold text-sm">Eroare:</p>
-                            <p className="text-red-600 text-xs mt-1 font-mono">{errorMsg}</p>
-                        </div>
-                    )}
                 </div>
 
                 <div className="relative flex py-2 items-center">
