@@ -115,6 +115,9 @@ export default function App() {
       
       setColumnMapping({ codeIndex: 0, descIndex: 1, stockIndex: stockIdx });
       setAppMode('MAPPING');
+      console.log("✅ AppMode schimbat în MAPPING. RawData rows:", rawData.length);
+      console.log("✅ Header row:", rawData[0]);
+      console.log("✅ Column mapping:", { codeIndex: 0, descIndex: 1, stockIndex: stockIdx });
       
     } catch (err: any) { 
       console.error(err);
@@ -229,7 +232,16 @@ export default function App() {
     return products.filter(p => p.code.toLowerCase().includes(lower) || p.description.toLowerCase().includes(lower));
   }, [products, searchTerm]);
 
-  const getColLetter = (n: number) => String.fromCharCode(65 + n);
+  // Helper: Convertește index de coloană în literă (0 = A, 1 = B, etc.)
+  const getColLetter = (index: number): string => {
+    let letter = '';
+    let num = index;
+    while (num >= 0) {
+      letter = String.fromCharCode((num % 26) + 65) + letter;
+      num = Math.floor(num / 26) - 1;
+    }
+    return letter;
+  };
 
   return (
     <div className="flex flex-col h-screen bg-gray-100 text-gray-800 font-sans overflow-hidden">
@@ -330,41 +342,49 @@ export default function App() {
         )}
 
         {/* VIEW 2: MAPPING */}
-        {appMode === 'MAPPING' && rawExcelData && (
-          <div className="max-w-4xl mx-auto bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden">
-             <div className="bg-gray-50 p-6 border-b">
-                <h2 className="text-2xl font-bold text-gray-800">Configurare Coloane</h2>
-                <p className="text-gray-500 text-sm">Asociază coloanele din Excel cu câmpurile aplicației.</p>
-             </div>
-             
-             <div className="p-8 grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
-                    <label className="block text-xs font-bold text-blue-600 uppercase mb-2">Coloana COD DE BARE</label>
-                    <select className="w-full border-gray-300 border p-3 rounded-lg bg-white shadow-sm focus:ring-2 focus:ring-blue-500 outline-none" value={columnMapping.codeIndex} onChange={(e) => setColumnMapping({...columnMapping, codeIndex: +e.target.value})}>
-                         {rawExcelData[0].map((h:any, i:number) => <option key={i} value={i}>Coloana {getColLetter(i)}: {h}</option>)}
-                    </select>
+        {appMode === 'MAPPING' && rawExcelData && (() => {
+          try {
+            console.log("🎨 Rendering MAPPING screen...");
+            return (
+              <div className="max-w-4xl mx-auto bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden">
+                <div className="bg-gray-50 p-6 border-b">
+                  <h2 className="text-2xl font-bold text-gray-800">Configurare Coloane</h2>
+                  <p className="text-gray-500 text-sm">Asociază coloanele din Excel cu câmpurile aplicației.</p>
                 </div>
-                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Coloana DESCRIERE</label>
-                    <select className="w-full border-gray-300 border p-3 rounded-lg bg-white shadow-sm outline-none" value={columnMapping.descIndex} onChange={(e) => setColumnMapping({...columnMapping, descIndex: +e.target.value})}>
-                         {rawExcelData[0].map((h:any, i:number) => <option key={i} value={i}>Coloana {getColLetter(i)}: {h}</option>)}
-                    </select>
+                
+                <div className="p-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
+                      <label className="block text-xs font-bold text-blue-600 uppercase mb-2">Coloana COD DE BARE</label>
+                      <select className="w-full border-gray-300 border p-3 rounded-lg bg-white shadow-sm focus:ring-2 focus:ring-blue-500 outline-none" value={columnMapping.codeIndex} onChange={(e) => setColumnMapping({...columnMapping, codeIndex: +e.target.value})}>
+                          {rawExcelData[0].map((h:any, i:number) => <option key={i} value={i}>Coloana {getColLetter(i)}: {h}</option>)}
+                      </select>
+                  </div>
+                  <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                      <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Coloana DESCRIERE</label>
+                      <select className="w-full border-gray-300 border p-3 rounded-lg bg-white shadow-sm outline-none" value={columnMapping.descIndex} onChange={(e) => setColumnMapping({...columnMapping, descIndex: +e.target.value})}>
+                          {rawExcelData[0].map((h:any, i:number) => <option key={i} value={i}>Coloana {getColLetter(i)}: {h}</option>)}
+                      </select>
+                  </div>
+                  <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                      <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Coloana STOC ACTUAL (Scriptic)</label>
+                      <select className="w-full border-gray-300 border p-3 rounded-lg bg-white shadow-sm outline-none" value={columnMapping.stockIndex} onChange={(e) => setColumnMapping({...columnMapping, stockIndex: +e.target.value})}>
+                          <option value={-1}>-- Fără Stoc --</option>
+                          {rawExcelData[0].map((h:any, i:number) => <option key={i} value={i}>Coloana {getColLetter(i)}: {h}</option>)}
+                      </select>
+                  </div>
                 </div>
-                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Coloana STOC ACTUAL (Scriptic)</label>
-                    <select className="w-full border-gray-300 border p-3 rounded-lg bg-white shadow-sm outline-none" value={columnMapping.stockIndex} onChange={(e) => setColumnMapping({...columnMapping, stockIndex: +e.target.value})}>
-                         <option value={-1}>-- Fără Stoc --</option>
-                         {rawExcelData[0].map((h:any, i:number) => <option key={i} value={i}>Coloana {getColLetter(i)}: {h}</option>)}
-                    </select>
-                </div>
-             </div>
 
-             <div className="bg-gray-50 p-6 flex justify-end gap-4 border-t">
-                <button onClick={() => { setRawExcelData(null); setAppMode('SETUP'); }} className="text-gray-500 font-bold hover:text-gray-700 px-4">Anulează</button>
-                <button onClick={handleConfirmMapping} className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg font-bold shadow-lg transition transform hover:-translate-y-0.5">Confirmă și Începe</button>
-             </div>
-          </div>
-        )}
+                <div className="bg-gray-50 p-6 flex justify-end gap-4 border-t">
+                  <button onClick={() => { setRawExcelData(null); setAppMode('SETUP'); }} className="text-gray-500 font-bold hover:text-gray-700 px-4">Anulează</button>
+                  <button onClick={handleConfirmMapping} className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg font-bold shadow-lg transition transform hover:-translate-y-0.5">Confirmă și Începe</button>
+                </div>
+              </div>
+            );
+          } catch (error) {
+            console.error("❌ Error rendering MAPPING screen:", error);
+            return <div className="text-red-500 p-4">Eroare la afișarea ecranului de mapare: {String(error)}</div>;
+          }
+        })()}
 
         {/* VIEW 3: ACTIVE */}
         {appMode === 'ACTIVE' && (
